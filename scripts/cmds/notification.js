@@ -2,9 +2,14 @@ const { getStreamsFromAttachment } = global.utils;
 const axios = require('axios');
 const fs = require('fs-extra');
 const path = require('path');
-const { createCanvas, loadImage } = require('canvas');
 
 const notificationMemory = {};
+
+// 🖼️ Images jointes au broadcast (aléatoire)
+const IMAGES = [
+  "https://i.ibb.co/NdnrhTgJ/473155112-938360181335287-9212391504228448125-n-jpg-stp-dst-jpg-s480x480-tt6-nc-cat-109-ccb-1-7-nc.jpg",
+  "https://i.ibb.co/v45Cnt4y/07ea4e464493.jpg"
+];
 
 async function getBuffer(url) {
   try {
@@ -15,44 +20,52 @@ async function getBuffer(url) {
   }
 }
 
-async function drawAvatar(ctx, url, x, y, radius, fallbackLetter, fallbackBg) {
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(x + radius, y + radius, radius, 0, Math.PI * 2, true);
-  ctx.closePath();
-  ctx.clip();
+async function getRandomImageStream() {
+  const url = IMAGES[Math.floor(Math.random() * IMAGES.length)];
+  const cacheDir = path.join(__dirname, 'cache');
+  await fs.ensureDir(cacheDir);
+  const tmpPath = path.join(cacheDir, `noti_${Date.now()}.jpg`);
+  const buffer = await getBuffer(url);
+  if (!buffer) return null;
+  fs.writeFileSync(tmpPath, buffer);
+  return { stream: fs.createReadStream(tmpPath), path: tmpPath };
+}
 
-  const buffer = url ? await getBuffer(url) : null;
-  if (buffer) {
-    try {
-      const img = await loadImage(buffer);
-      ctx.drawImage(img, x, y, radius * 2, radius * 2);
-      ctx.restore();
-      return;
-    } catch {}
-  }
+// ✍️ Police stylée (sans-serif gras unicode)
+function toStyledFont(text = "") {
+  const map = {
+    A:"𝗔",B:"𝗕",C:"𝗖",D:"𝗗",E:"𝗘",F:"𝗙",G:"𝗚",H:"𝗛",I:"𝗜",J:"𝗝",
+    K:"𝗞",L:"𝗟",M:"𝗠",N:"𝗡",O:"𝗢",P:"𝗣",Q:"𝗤",R:"𝗥",S:"𝗦",T:"𝗧",
+    U:"𝗨",V:"𝗩",W:"𝗪",X:"𝗫",Y:"𝗬",Z:"𝗭",
+    a:"𝗮",b:"𝗯",c:"𝗰",d:"𝗱",e:"𝗲",f:"𝗳",g:"𝗴",h:"𝗵",i:"𝗶",j:"𝗷",
+    k:"𝗸",l:"𝗹",m:"𝗺",n:"𝗻",o:"𝗼",p:"𝗽",q:"𝗾",r:"𝗿",s:"𝘀",t:"𝘁",
+    u:"𝘂",v:"𝘃",w:"𝘄",x:"𝘅",y:"𝘆",z:"𝘇",
+    " ":" "
+  };
+  return text.split("").map(c => map[c] || c).join("");
+}
 
-  ctx.fillStyle = fallbackBg;
-  ctx.fillRect(x, y, radius * 2, radius * 2);
-  ctx.fillStyle = "#FFFFFF";
-  ctx.font = `bold ${radius}px sans-serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(fallbackLetter, x + radius, y + radius);
-  ctx.restore();
+function frame(title, body) {
+  return (
+`╭─────═━ ${title} ━═─────╮
+
+${body}
+
+╰─────═━━━━━━━━━━═─────╯`
+  );
 }
 
 module.exports = {
   config: {
     name: "notification",
     aliases: ["notify", "noti"],
-    version: "14.0",
+    version: "15.0",
     author: "Camille uchiha",
     countDown: 5,
     role: 2,
     category: "owner",
-    shortDescription: "Broadcast Pro Canvas avec Avatars et Heure",
-    longDescription: "Génère un Canvas professionnel incluant l'avatar de l'admin, du groupe et l'heure système.",
+    shortDescription: "Broadcast texte stylé avec image",
+    longDescription: "Diffuse un message texte stylé accompagné d'une image et des instructions pour répondre à l'admin via callad.",
     guide: { en: `Usage: {pn} <message>` },
     usePrefix: false,
     noPrefix: true
@@ -63,12 +76,7 @@ module.exports = {
     const textToDraw = args.join(" ");
     if (!textToDraw) return message.reply(`[SYSTEM] ERREUR: Contenu du message vide.`);
 
-    const cacheDir = path.join(__dirname, 'cache');
-    const cachePath = path.join(cacheDir, `noti_pro_${Date.now()}.jpg`);
-    if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
-
     const adminID = event.senderID;
-    let adminAvatarUrl = `https://graph.facebook.com/${adminID}/picture?width=200&height=200`;
     let adminName = "Administrateur";
     try {
       const usersInfo = await api.getUserInfo(adminID);
@@ -82,143 +90,65 @@ module.exports = {
 
     message.reply(`[SYSTEM] Envoie en cours..⏳(${allThreads.length} groupes)...`);
 
-    const bgImageUrl = 'https://i.ibb.co/F44C5WTs/e2648878efd8.jpg';
-    let bgImage = null;
-    const bgBuffer = await getBuffer(bgImageUrl);
-    if (bgBuffer) {
-      try {
-        bgImage = await loadImage(bgBuffer);
-      } catch {}
-    }
+    const prefix = global.GoatBot?.config?.prefix || "¥";
 
     let sendSuccess = 0;
     const sendError = [];
 
     for (const thread of allThreads) {
       let groupName = thread.name || "Groupe sans nom";
-      let groupAvatarUrl = null;
 
       try {
         const threadInfo = await api.getThreadInfo(thread.threadID);
         groupName = threadInfo.threadName || groupName;
-        if (threadInfo.imageSrc) groupAvatarUrl = threadInfo.imageSrc;
       } catch {}
 
       const now = new Date();
       const timeString = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
       try {
-        const canvas = createCanvas(1200, 675);
-        const ctx = canvas.getContext('2d');
+        const bodyContent =
+`👑 ${toStyledFont("De")} : ${adminName}
+🏠 ${toStyledFont("Groupe")} : ${groupName}
+🕐 ${toStyledFont("Envoyé a")} ${timeString}
 
-        if (bgImage) {
-          ctx.drawImage(bgImage, 0, 0, canvas.width, canvas.height);
-        } else {
-          const bgGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-          bgGradient.addColorStop(0, '#0f141c');
-          bgGradient.addColorStop(1, '#080b10');
-          ctx.fillStyle = bgGradient;
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-        }
+━━━━━━━━━━━━━━━
 
-        const boxX = 40, boxY = 40, boxW = canvas.width - 80, boxH = canvas.height - 80;
-        ctx.fillStyle = "rgba(17, 22, 30, 0.9)";
-        ctx.strokeStyle = "rgba(229, 26, 36, 0.8)";
-        ctx.lineWidth = 4;
-        
-        ctx.beginPath();
-        ctx.roundRect(boxX, boxY, boxW, boxH, 16);
-        ctx.fill();
-        ctx.stroke();
+💬 ${toStyledFont(textToDraw)}
 
-        ctx.fillStyle = "#E51A24";
-        ctx.font = "bold 32px sans-serif";
-        ctx.fillText("▍ SYSTEM BROADCAST", boxX + 40, boxY + 65);
+━━━━━━━━━━━━━━━
 
-        ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
-        ctx.font = "26px sans-serif";
-        ctx.textAlign = "right";
-        ctx.fillText(`Envoyé à ${timeString}`, boxX + boxW - 40, boxY + 65);
-        ctx.textAlign = "left";
+📌 ${toStyledFont("Pour repondre a l administration")} :
+✍️ Ecris ${prefix}callad + ton message
 
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(boxX + 40, boxY + 100);
-        ctx.lineTo(boxX + boxW - 40, boxY + 100);
-        ctx.stroke();
+Exemple :
+${prefix}callad salut bro`;
 
-        await drawAvatar(ctx, adminAvatarUrl, boxX + 40, boxY + 130, 45, adminName.charAt(0), "#3b5998");
-        ctx.fillStyle = "#FFFFFF";
-        ctx.font = "bold 24px sans-serif";
-        ctx.fillText(adminName, boxX + 150, boxY + 170);
-        ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
-        ctx.font = "18px sans-serif";
-        ctx.fillText("Administrateur Système", boxX + 150, boxY + 200);
+        const body = "📢 " + frame(toStyledFont("SYSTEM BROADCAST"), bodyContent);
 
-        const groupAvatarX = boxX + boxW - 130;
-        await drawAvatar(ctx, groupAvatarUrl, groupAvatarX, boxY + 130, 45, groupName.charAt(0), "#1db954");
-        ctx.fillStyle = "#FFFFFF";
-        ctx.font = "bold 24px sans-serif";
-        ctx.textAlign = "right";
-        ctx.fillText(groupName, groupAvatarX - 20, boxY + 170);
-        ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
-        ctx.font = "18px sans-serif";
-        ctx.fillText("Groupe Destinataire", groupAvatarX - 20, boxY + 200);
-        ctx.textAlign = "left";
-
-        ctx.beginPath();
-        ctx.moveTo(boxX + 40, boxY + 250);
-        ctx.lineTo(boxX + boxW - 40, boxY + 250);
-        ctx.stroke();
-
-        ctx.fillStyle = "#EAEAEA";
-        ctx.font = "30px sans-serif";
-        
-        const words = textToDraw.split(' ');
-        let line = '';
-        const lines = [];
-        const maxWidth = boxW - 100;
-        const lineHeight = 48;
-
-        for (let n = 0; n < words.length; n++) {
-          let testLine = line + words[n] + ' ';
-          let metrics = ctx.measureText(testLine);
-          if (metrics.width > maxWidth && n > 0) {
-            lines.push(line);
-            line = words[n] + ' ';
-          } else {
-            line = testLine;
-          }
-        }
-        lines.push(line);
-
-        let textY = boxY + 320;
-        for (let k = 0; k < lines.length; k++) {
-          if (textY < boxY + boxH - 50) {
-            ctx.fillText(lines[k], boxX + 50, textY);
-            textY += lineHeight;
-          }
-        }
-
-        const buffer = canvas.toBuffer('image/jpeg', { quality: 0.95 });
-        fs.writeFileSync(cachePath, buffer);
+        const randomImage = await getRandomImageStream();
+        const attachments = [];
+        if (randomImage) attachments.push(randomImage.stream);
+        attachments.push(
+          ...await getStreamsFromAttachment([
+            ...event.attachments,
+            ...(event.messageReply?.attachments || [])
+          ])
+        );
 
         const formSend = {
-          body: `📢 **Alerte Système Administration**`,
-          attachment: [
-            fs.createReadStream(cachePath),
-            ...await getStreamsFromAttachment([
-              ...event.attachments,
-              ...(event.messageReply?.attachments || [])
-            ])
-          ]
+          body,
+          attachment: attachments
         };
 
         const sentMsg = await api.sendMessage(formSend, thread.threadID);
         sendSuccess++;
         notificationMemory[`${thread.threadID}_${sentMsg.messageID}`] = { groupName, threadID: thread.threadID };
-        
+
+        if (randomImage) {
+          setTimeout(() => { if (fs.existsSync(randomImage.path)) fs.unlinkSync(randomImage.path); }, 20000);
+        }
+
         await new Promise(resolve => setTimeout(resolve, delayPerGroup));
 
       } catch (err) {
@@ -230,8 +160,6 @@ module.exports = {
         sendError.push({ threadID: thread.threadID, groupName, error: errorMsg });
       }
     }
-
-    setTimeout(() => { if (fs.existsSync(cachePath)) fs.unlinkSync(cachePath); }, 20000);
 
     let bilan = `[BILAN DIFFUSION]\n🟢 Réussis: ${sendSuccess}\n🔴 Échecs: ${sendError.length}`;
     if (sendError.length) sendError.forEach(err => { bilan += `\n- ${err.groupName}: ${err.error}`; });
@@ -255,4 +183,3 @@ module.exports = {
     api.sendMessage(adminMessage, targetAdmin);
   }
 };
-
