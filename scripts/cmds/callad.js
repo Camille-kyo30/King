@@ -1,10 +1,39 @@
 const { getStreamsFromAttachment, log } = global.utils;
+const axios = require('axios');
+const fs = require('fs-extra');
+const path = require('path');
 const mediaTypes = ["photo", "png", "animated_image", "video", "audio"];
+
+// 🖼️ Images Nagi & Bachira jointes aux échanges avec l'admin
+const IMAGES = [
+	"https://i.ibb.co/ymLTMGqB/6b8613d0dff5.jpg",
+	"https://i.ibb.co/9kwYLMCS/668485e39063.jpg"
+];
+
+async function getBuffer(url) {
+	try {
+		const response = await axios.get(url, { responseType: 'arraybuffer', timeout: 5000 });
+		return Buffer.from(response.data);
+	} catch {
+		return null;
+	}
+}
+
+async function getRandomImageStream() {
+	const url = IMAGES[Math.floor(Math.random() * IMAGES.length)];
+	const cacheDir = path.join(__dirname, 'cache');
+	await fs.ensureDir(cacheDir);
+	const tmpPath = path.join(cacheDir, `callad_${Date.now()}.jpg`);
+	const buffer = await getBuffer(url);
+	if (!buffer) return null;
+	fs.writeFileSync(tmpPath, buffer);
+	return { stream: fs.createReadStream(tmpPath), path: tmpPath };
+}
 
 module.exports = {
 	config: {
 		name: "callad",
-	version: "1.8",
+	version: "1.9",
 		author: "NTKhang",
 		editor: "Camille Uchiha 🍓",
 		countDown: 5,
@@ -50,17 +79,17 @@ module.exports = {
 			noAdmin: "This bot currently has no admin."
 		},
 		fr: {
-			missingMessage: `🍓━━━━━━━━🍓\n⚠️ 𝗘𝗥𝗘𝗨𝗥\nVeuillez saisir votre message à envoyer aux admins\n🍓━━━━━━━━🍓`,
+			missingMessage: `⚽😴━━━━━━━━⚽😴\n⚠️ 𝗘𝗥𝗥𝗘𝗨𝗥\n😴 Nagi : « Ecris un message... j'ai la flemme de deviner ce que tu veux. »\n⚽ Bachira : « MIAOU ! Sans message, comment veux-tu que je dévore ta demande ?! »\n⚽😴━━━━━━━━⚽😴`,
 			sendByGroup: `\n📍 𝗚𝗿𝗼𝘂𝗽𝗲: %1\n🆔 𝗜𝗗: %2`,
 			sendByUser: `\n📍 𝗠𝗣: Message privé`,
 			content: `\n\n📝 𝗖𝗢𝗡𝗧𝗘𝗡𝗨:\n─────────────────\n%1\n─────────────────\n💬 Répondez à ce message pour répondre`,
-			success: `🍓━━━━━━━━🍓\n✅ 𝗘𝗡𝗩𝗢𝗬𝗘́\n\nMessage envoyé à %1 admin(s) !\n%2\n🍓━━━━━━━━🍓`,
-			failed: `🍓━━━━━━━━🍓\n❌ 𝗘́𝗖𝗛𝗘𝗖\nErreur d'envoi à %1 admin(s)\n%2\n🍓━━━━━━━━🍓`,
-			reply: `🍓━━━━━━━━🍓\n⌖ 𝗥𝗘́𝗣𝗢𝗡𝗦𝗘 𝗔𝗗𝗠𝗜𝗡 %1\n─────────────────\n%2\n─────────────────\n💬 Répondez pour continuer\n🍓━━━━━━━━🍓`,
-			replySuccess: `🍓━━━━━━━━🍓\n✅ 𝗘𝗡𝗩𝗢𝗬𝗘́\nRéponse envoyée à l'admin !\n🍓━━━━━━━━🍓`,
-			feedback: `🍓━━━━━━━━🍓\n✎ 𝗠𝗘𝗦𝗦𝗔𝗚𝗘 𝗨𝗦𝗘𝗥 %1\n- 𝗜𝗗: %2%3\n\n📝 𝗖𝗢𝗡𝗧𝗘𝗡𝗨:\n─────────────────\n%4\n─────────────────\n💬 Répondez pour répondre\n🍓━━━━━━━━🍓`,
-			replyUserSuccess: `🍓━━━━━━━━🍓\n✅ 𝗘𝗡𝗩𝗢𝗬𝗘́\nRéponse envoyée à l'utilisateur !\n🍓━━━━━━━━🍓`,
-			noAdmin: `🍓━━━━━━━━🍓\n❌ 𝗘𝗥𝗥𝗘𝗨𝗥\nAucun admin configuré pour ce bot\n🍓━━━━━━━━🍓`
+			success: `⚽😴━━━━━━━━⚽😴\n✅ 𝗘𝗡𝗩𝗢𝗬𝗘́\n\nMessage envoyé à %1 admin(s) !\n%2\n\n😴 Nagi : « C'est fait. Sans effort, comme toujours. »\n⚽ Bachira : « Ton message est parti dévorer l'admin, MIAOUUU ! »\n⚽😴━━━━━━━━⚽😴`,
+			failed: `⚽😴━━━━━━━━⚽😴\n❌ 𝗘́𝗖𝗛𝗘𝗖\nErreur d'envoi à %1 admin(s)\n%2\n\n😴 Nagi : « Bof, ça arrive. Réessaie, flemme de m'énerver pour ça. »\n⚽😴━━━━━━━━⚽😴`,
+			reply: `⚽😴━━━━━━━━⚽😴\n⌖ 𝗥𝗘́𝗣𝗢𝗡𝗦𝗘 𝗔𝗗𝗠𝗜𝗡 %1\n─────────────────\n%2\n─────────────────\n💬 Répondez pour continuer\n\n😴 Nagi : « L'admin a répondu. Facile, non ? »\n⚽ Bachira : « Vas-y, mords dans la conversation, ne reste pas hors-jeu ! »\n⚽😴━━━━━━━━⚽😴`,
+			replySuccess: `⚽😴━━━━━━━━⚽😴\n✅ 𝗘𝗡𝗩𝗢𝗬𝗘́\nRéponse envoyée à l'admin !\n\n😴 Nagi : « Envoyé. Pas la peine de stresser. »\n⚽😴━━━━━━━━⚽😴`,
+			feedback: `⚽😴━━━━━━━━⚽😴\n✎ 𝗠𝗘𝗦𝗦𝗔𝗚𝗘 𝗨𝗦𝗘𝗥 %1\n- 𝗜𝗗: %2%3\n\n📝 𝗖𝗢𝗡𝗧𝗘𝗡𝗨:\n─────────────────\n%4\n─────────────────\n💬 Répondez pour répondre\n\n⚽ Bachira : « Un utilisateur veut te parler, MIAOU ! Ne le laisse pas hors-jeu ! »\n⚽😴━━━━━━━━⚽😴`,
+			replyUserSuccess: `⚽😴━━━━━━━━⚽😴\n✅ 𝗘𝗡𝗩𝗢𝗬𝗘́\nRéponse envoyée à l'utilisateur !\n\n😴 Nagi : « Terminé. Ez comme d'hab. »\n⚽😴━━━━━━━━⚽😴`,
+			noAdmin: `⚽😴━━━━━━━━⚽😴\n❌ 𝗘𝗥𝗥𝗘𝗨𝗥\nAucun admin configuré pour ce bot\n\n😴 Nagi : « Pas d'admin... même moi je peux rien faire là. »\n⚽😴━━━━━━━━⚽😴`
 		}
 	},
 
@@ -83,12 +112,15 @@ module.exports = {
 			groupDetails = getLang("sendByUser");
 		}
 
-		const msg = `🍓━━━━━━━━🍓\n📨 𝗔𝗣𝗣𝗘𝗟 𝗔𝗗𝗠𝗜𝗡 📨\n🍓━━━━━━━━🍓\n👤 𝗡𝗼𝗺: ${senderName}\n🆔 𝗜𝗗: ${senderID}` + groupDetails;
+		const msg = `⚽😴━━━━━━━━⚽😴\n📨 𝗔𝗣𝗣𝗘𝗟 𝗔𝗗𝗠𝗜𝗡 📨\n⚽😴━━━━━━━━⚽😴\n👤 𝗡𝗼𝗺: ${senderName}\n🆔 𝗜𝗗: ${senderID}` + groupDetails;
 
 		const attachments = await getStreamsFromAttachment(
 			[...event.attachments, ...(event.messageReply?.attachments || [])]
 				.filter(item => mediaTypes.includes(item.type))
 		);
+
+		const randomImage = await getRandomImageStream();
+		if (randomImage) attachments.push(randomImage.stream);
 
 		const formMessage = {
 			body: msg + getLang("content", args.join(" ")),
@@ -120,6 +152,10 @@ module.exports = {
 			}
 	}
 
+		if (randomImage) {
+			setTimeout(() => { if (fs.existsSync(randomImage.path)) fs.unlinkSync(randomImage.path); }, 20000);
+		}
+
 		let msg2 = "";
 		if (successIDs.length > 0) {
 			msg2 += getLang("success", successIDs.length,
@@ -148,6 +184,9 @@ module.exports = {
 			event.attachments.filter(item => mediaTypes.includes(item.type))
 		);
 
+		const randomImage = await getRandomImageStream();
+		if (randomImage) attachments.push(randomImage.stream);
+
 		switch (type) {
 			case "userCallAdmin": {
 				const formMessage = {
@@ -157,6 +196,7 @@ module.exports = {
 				};
 
 				api.sendMessage(formMessage, threadID, (err, info) => {
+					if (randomImage) fs.unlink(randomImage.path, () => {});
 					if (err) return message.reply("Erreur lors de l'envoi : " + JSON.stringify(err));
 					message.reply(getLang("replyUserSuccess"));
 					global.GoatBot.onReply.set(info.messageID, {
@@ -187,6 +227,7 @@ module.exports = {
 				};
 
 				api.sendMessage(formMessage, threadID, (err, info) => {
+					if (randomImage) fs.unlink(randomImage.path, () => {});
 					if (err) return message.reply("Erreur lors de l'envoi : " + JSON.stringify(err));
 					message.reply(getLang("replySuccess"));
 					global.GoatBot.onReply.set(info.messageID, {
@@ -200,6 +241,7 @@ module.exports = {
 				break;
 			}
 			default:
+				if (randomImage) fs.unlink(randomImage.path, () => {});
 				break;
 	}
 	}
