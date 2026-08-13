@@ -1,9 +1,9 @@
-const { getTime, drive } = global.utils;
+const { getTime } = global.utils;
 
 module.exports = {
 	config: {
 		name: "leave",
-		version: "1.5",
+		version: "1.8",
 		author: "NTKhang",
 		editor: "Camille Uchiha 🍓",
 		category: "events"
@@ -18,8 +18,9 @@ module.exports = {
 			leaveType1: "tự rời",
 			leaveType2: "bị kick",
 			defaultLeaveMessage: "{userName} đã {type} khỏi nhóm"
-	},
-	en: {
+		},
+
+		en: {
 			session1: "morning",
 			session2: "noon",
 			session3: "afternoon",
@@ -27,57 +28,122 @@ module.exports = {
 			leaveType1: "left",
 			leaveType2: "was kicked from",
 			defaultLeaveMessage: "{userName} {type} the group"
-	},
-	fr: {
+		},
+
+		fr: {
 			session1: "matin",
 			session2: "midi",
 			session3: "après-midi",
 			session4: "soir",
-			leaveType1: "a quitté",
-			leaveType2: "a été expulsé de",
-			defaultLeaveMessage: `🍓━━━━━━━━🍓\n\n👋 𝗗𝗘́𝗣𝗔𝗥𝗧 👋\n\n{userNameTag} {type} {boxName}\n🕐 {time}h - {session}\n\n🍓━━━━━━━━🍓`
-	}
+
+			leaveType1: "a décidé de s'en aller de",
+			leaveType2: "s'est fait éjecter de",
+
+			defaultLeaveMessage:
+`⚽━━━━━━━━━━━━━━━━━━━━⚽
+ 🥱 𝗡𝗔𝗚𝗜 𝗦𝗘𝗜𝗦𝗛𝗜𝗥𝗢 • 𝗕𝗟𝗨𝗘 𝗟𝗢𝗖𝗞
+━━━━━━━━━━━━━━━━━━━━⚽
+
+👤 {userNameTag}
+{type} le groupe {boxName}.
+
+💭 « Pff... Encore un qui abandonne le terrain.
+C'est tellement galère de bouger... Bref, bon débarras. »
+
+🏟️ **Statut :** Éliminé du projet
+🕐 **Heure :** {time} • {session}
+
+⚽━━━━━━━━━━━━━━━━━━━━⚽`
+		}
 	},
 
-	onStart: async ({ threadsData, message, event, api, usersData, getLang }) => {
+	onStart: async ({
+		threadsData,
+		message,
+		event,
+		api,
+		usersData,
+		getLang
+	}) => {
+
 		if (event.logMessageType == "log:unsubscribe")
+
 			return async function () {
+
 				const { threadID } = event;
-				const threadData = await threadsData.get(threadID);
+
+				const threadData =
+					await threadsData.get(threadID);
+
 				if (!threadData.settings.sendLeaveMessage)
 					return;
-				const { leftParticipantFbId } = event.logMessageData;
+
+				const {
+					leftParticipantFbId
+				} = event.logMessageData;
+
 				if (leftParticipantFbId == api.getCurrentUserID())
 					return;
+
 				const hours = getTime("HH");
+				const minutes = getTime("mm");
+				const formattedTime = `${hours}h${minutes}`;
 
-				const threadName = threadData.threadName;
-				const userName = await usersData.getName(leftParticipantFbId);
+				const threadName =
+					threadData.threadName;
 
-				let { leaveMessage = getLang("defaultLeaveMessage") } = threadData.data;
+				const userName =
+					await usersData.getName(leftParticipantFbId);
+
+				let leaveMessage = threadData.data?.leaveMessage || getLang("defaultLeaveMessage");
+
 				const form = {
-					mentions: leaveMessage.match(/\{userNameTag\}/g) ? [{
-						tag: userName,
-						id: leftParticipantFbId
-					}] : null
+					mentions: leaveMessage.match(/\{userNameTag\}/g)
+						? [{
+							tag: userName,
+							id: leftParticipantFbId
+						}]
+						: null
 				};
 
 				leaveMessage = leaveMessage
-					.replace(/\{userName\}|\{userNameTag\}/g, userName)
-					.replace(/\{type\}/g, leftParticipantFbId == event.author ? getLang("leaveType1") : getLang("leaveType2"))
-					.replace(/\{threadName\}|\{boxName\}/g, threadName)
-					.replace(/\{time\}/g, hours)
-					.replace(/\{session\}/g, hours <= 10 ?
-						getLang("session1") :
-						hours <= 12 ?
-							getLang("session2") :
-							hours <= 18 ?
-								getLang("session3") :
-								getLang("session4")
+					.replace(
+						/\{userName\}|\{userNameTag\}/g,
+						userName
+					)
+
+					.replace(
+						/\{type\}/g,
+						leftParticipantFbId == event.author
+							? getLang("leaveType1")
+							: getLang("leaveType2")
+					)
+
+					.replace(
+						/\{threadName\}|\{boxName\}/g,
+						threadName
+					)
+
+					.replace(
+						/\{time\}/g,
+						formattedTime
+					)
+
+					.replace(
+						/\{session\}/g,
+						hours <= 10
+							? getLang("session1")
+							: hours <= 12
+								? getLang("session2")
+								: hours <= 18
+									? getLang("session3")
+									: getLang("session4")
 					);
 
 				form.body = leaveMessage;
-				message.send(form);
+
+				me
+					ssage.send(form);
 			};
 	}
 };
