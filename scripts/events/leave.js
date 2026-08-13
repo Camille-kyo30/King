@@ -3,7 +3,7 @@ const { getTime } = global.utils;
 module.exports = {
 	config: {
 		name: "leave",
-		version: "1.8",
+		version: "1.6",
 		author: "NTKhang",
 		editor: "Camille Uchiha 🍓",
 		category: "events"
@@ -36,22 +36,22 @@ module.exports = {
 			session3: "après-midi",
 			session4: "soir",
 
-			leaveType1: "a décidé de s'en aller de",
-			leaveType2: "s'est fait éjecter de",
+			leaveType1: "a quitté",
+			leaveType2: "a été expulsé de",
 
 			defaultLeaveMessage:
 `⚽━━━━━━━━━━━━━━━━━━━━⚽
- 🥱 𝗡𝗔𝗚𝗜 𝗦𝗘𝗜𝗦𝗛𝗜𝗥𝗢 • 𝗕𝗟𝗨𝗘 𝗟𝗢𝗖𝗞
-━━━━━━━━━━━━━━━━━━━━⚽
+
+😴 𝗡𝗔𝗚𝗜 • 𝗗𝗘́𝗣𝗔𝗥𝗧
 
 👤 {userNameTag}
-{type} le groupe {boxName}.
+{type} le groupe.
 
-💭 « Pff... Encore un qui abandonne le terrain.
-C'est tellement galère de bouger... Bref, bon débarras. »
+💭 « Trop d'efforts...
+Bon, c'est pas grave. »
 
-🏟️ **Statut :** Éliminé du projet
-🕐 **Heure :** {time} • {session}
+🏟️ Groupe : {boxName}
+🕐 {time}h • {session}
 
 ⚽━━━━━━━━━━━━━━━━━━━━⚽`
 		}
@@ -86,8 +86,6 @@ C'est tellement galère de bouger... Bref, bon débarras. »
 					return;
 
 				const hours = getTime("HH");
-				const minutes = getTime("mm");
-				const formattedTime = `${hours}h${minutes}`;
 
 				const threadName =
 					threadData.threadName;
@@ -95,7 +93,9 @@ C'est tellement galère de bouger... Bref, bon débarras. »
 				const userName =
 					await usersData.getName(leftParticipantFbId);
 
-				let leaveMessage = threadData.data?.leaveMessage || getLang("defaultLeaveMessage");
+				let {
+					leaveMessage = getLang("defaultLeaveMessage")
+				} = threadData.data;
 
 				const form = {
 					mentions: leaveMessage.match(/\{userNameTag\}/g)
@@ -126,7 +126,7 @@ C'est tellement galère de bouger... Bref, bon débarras. »
 
 					.replace(
 						/\{time\}/g,
-						formattedTime
+						hours
 					)
 
 					.replace(
@@ -142,8 +142,7 @@ C'est tellement galère de bouger... Bref, bon débarras. »
 
 				form.body = leaveMessage;
 
-				me
-					ssage.send(form);
+				message.send(form);
 			};
 	}
 };
