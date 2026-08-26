@@ -12,7 +12,7 @@
   "antiInbox": false,
   "language": "fr",
   "notesLanguage": "change to your language with ISO 639-1 code, available languages: vi (Vietnamese), en (English)",
-  "nickNameBot": "Mini bot",
+  "nickNameBot": "🎀 Mini bot 🎀",
   "prefix": "¥",
   "noPrefix": true,
   "noPrefixNotes": "When true, Bot Admins (role 2) and Developers (role 4) can run commands without the prefix",
@@ -21,28 +21,28 @@
     "ignoreCommand": []
   },
   "adminBot": [
-    "61591108301616",
-    "61589558798221",
-    "61592410694687"
+    "61593963982581",
+    "",
+    ""
   ],
   "premiumUsers": [
-    "61591108301616",
-    "61589558798221",
-    "61592410694687"
+    "61593963982581",
+    "",
+    ""
   ],
   "devUsers": [
-    "61591108301616",
-    "61589558798221",
-    "61592410694687"
+    "61593963982581",
+    "",
+    ""
   ],
   "notes_premiumUsers": "List of user IDs with premium access (role 3)",
   "notes_devUsers": "List of developer IDs with full access (role 4)",
   "whiteListMode": {
     "enable": false,
     "whiteListIds": [
-      "61591108301616",
-      "61589558798221",
-      "61592410694687"
+      "61593963982581",
+      "",
+      ""
     ],
     "notes": "if you enable this feature, only the ids in the whiteListIds list can use the bot"
   },
