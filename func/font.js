@@ -227,4 +227,3 @@ const fonts = {
 };
 
 module.exports = fonts;
-        
