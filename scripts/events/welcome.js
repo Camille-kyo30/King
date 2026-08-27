@@ -1,153 +1,260 @@
-const fs = require("fs-extra");
-const path = require("path");
-const axios = require("axios");
-const { getTime, drive } = global.utils;
-
-if (!global.temp.welcomeEvent) global.temp.welcomeEvent = {};
-
-// 🔵 Images Nagi Bachira (Blue Lock)
-// ⚠️ Utilise des liens DIRECTS (i.ibb.co/.../image.jpg), pas les pages ibb.co
-const NAGI_IMAGES = [
-	"https://i.ibb.co/yB43FxKB/nagi1.jpg",
-	"https://i.ibb.co/95Nzcm8/nagi2.jpg"
-];
-
-async function getNagiStreams() {
-	const streams = [];
-	for (let i = 0; i < NAGI_IMAGES.length; i++) {
-		try {
-			const res = await axios.get(NAGI_IMAGES[i], { responseType: "arraybuffer" });
-			const filePath = path.join(__dirname, "tmp", `nagi_${i}.jpg`);
-			await fs.ensureDir(path.join(__dirname, "tmp"));
-			await fs.writeFile(filePath, Buffer.from(res.data, "utf-8"));
-			streams.push(fs.createReadStream(filePath));
-		} catch (e) {
-			console.log("[welcome] image Nagi indisponible:", NAGI_IMAGES[i]);
-		}
-	}
-	return streams;
-}
+const { createCanvas, loadImage } = require('canvas');
+const fs = require('fs-extra');
+const axios = require('axios');
+const path = require('path');
 
 module.exports = {
-	config: {
-		name: "welcome",
-		version: "2.2",
-		author: "NTKhang + Modified by Camille Uchiha",
-		category: "events"
-	},
+    config: {
+        name: "welcome",
+        version: "1.3.0",
+        author: "Camille uchiha 🎀",
+        countDown: 5,
+        role: 0,
+        description: "Envoie une carte de bienvenue Canvas (avec la photo de profil) lorsqu'un utilisateur rejoint le groupe",
+        category: "events",
+        guide: {
+            en: "{pn} s'active automatiquement quand quelqu'un rejoint le groupe."
+        }
+    },
 
-	langs: {
-		vi: {
-			session1: "☀ 𝗦𝗮́𝗻𝗴",
-			session2: "⛅ 𝗧𝗿𝘂̛𝗮",
-			session3: "🌆 𝗖𝗵𝗶𝗲̂̀𝘂",
-			session4: "🌙 𝗧𝗼̂́𝗶",
-			welcomeMessage: "🔵▬▬▬【 𝗕𝗟𝗨𝗘 𝗟𝗢𝗖𝗞 】▬▬▬🔵\n⚽ 𝗡𝗔𝗚𝗜 𝗕𝗔𝗖𝗛𝗜𝗥𝗔 𝗘𝗡𝗧𝗥𝗘 𝗦𝗨𝗥 𝗟𝗘 𝗧𝗘𝗥𝗥𝗔𝗜𝗡\n⚡ 𝗣𝗿𝗲𝗳𝗶𝘅: %1\n🔎 𝗡𝗵𝗮̣̂𝗽: %1help\n🔵▬▬▬▬▬▬▬▬▬▬▬▬▬🔵",
-			multiple1: "🔹 𝗕𝗮̣𝗻",
-			multiple2: "🔹 𝗖𝗮́𝗰 𝗯𝗮̣𝗻",
-			defaultWelcomeMessage: "🔵▬▬▬【 𝗕𝗟𝗨𝗘 𝗟𝗢𝗖𝗞 】▬▬▬🔵\n⚽ 𝗖𝗵𝗮̀𝗼 𝗺𝘂̛̀𝗻𝗴 {userName}\n🏟️ 『 {boxName} 』\n🌙 {session}\n📥 {adderName}\n🔵▬▬▬▬▬▬▬▬▬▬▬▬▬🔵"
-		},
-		en: {
-			session1: "☀ 𝚖𝚘𝚛𝚗𝚒𝚗𝚐",
-			session2: "⛅ 𝚗𝚘𝚘𝚗",
-			session3: "🌆 𝚊𝚏𝚝𝚎𝚛𝚗𝚘𝚘𝚗",
-			session4: "🌙 𝚎𝚟𝚎𝚗𝚒𝚗𝚐",
-			welcomeMessage: "🔵▬▬▬【 𝐁𝐋𝐔𝐄 𝐋𝐎𝐂𝐊 】▬▬▬🔵\n⚽ 𝗡𝗔𝗚𝗜 𝗕𝗔𝗖𝗛𝗜𝗥𝗔 𝗵𝗮𝘀 𝗲𝗻𝘁𝗲𝗿𝗲𝗱 𝘁𝗵𝗲 𝗳𝗶𝗲𝗹𝗱\n💤 \"𝚂𝚘𝚞𝚗𝚍𝚜 𝚕𝚒𝚔𝚎 𝚊 𝚙𝚊𝚒𝚗... 𝚋𝚞𝚝 𝙸'𝚕𝚕 𝚍𝚘 𝚒𝚝.\"\n⚡ 𝙿𝚛𝚎𝚏𝚒𝚡: %1\n🔎 𝙲𝚘𝚖𝚖𝚊𝚗𝚍𝚜: %1help\n🔵▬▬▬▬▬▬▬▬▬▬▬▬▬🔵",
-			multiple1: "🔹 𝚢𝚘𝚞",
-			multiple2: "🔹 𝚢𝚘𝚞 𝚐𝚞𝚢𝚜",
-			defaultWelcomeMessage: "🔵▬▬▬【 𝐁𝐋𝐔𝐄 𝐋𝐎𝐂𝐊 】▬▬▬🔵\n⚽ 𝙽𝙴𝚆 𝙿𝙻𝙰𝚈𝙴𝚁 𝚂𝙴𝙻𝙴𝙲𝚃𝙴𝙳\n👤 ✨{userName}✨\n🏟️ 𝚆𝚎𝚕𝚌𝚘𝚖𝚎 {multiple} 𝚝𝚘: {boxName}\n🌙 𝙷𝚊𝚟𝚎 𝚊 𝚗𝚒𝚌𝚎 {session}\n📥 𝙰𝚍𝚍𝚎𝚍 𝚋𝚢: ✨{adderName}✨\n💤 𝙽𝚊𝚐𝚒: \"𝙳𝚘𝚗'𝚝 𝚖𝚊𝚔𝚎 𝚒𝚝 𝚌𝚘𝚖𝚙𝚕𝚒𝚌𝚊𝚝𝚎𝚍.\"\n🔵▬▬▬▬▬▬▬▬▬▬▬▬▬🔵"
-		},
-		fr: {
-			session1: "☀ 𝙼𝚊𝚝𝚒𝚗",
-			session2: "⛅ 𝙼𝚒𝚍𝚒",
-			session3: "🌆 𝙰𝚙𝚛𝚎̀𝚜-𝚖𝚒𝚍𝚒",
-			session4: "🌙 𝚂𝚘𝚒𝚛",
-			welcomeMessage: "🔵▬▬▬【 𝐁𝐋𝐔𝐄 𝐋𝐎𝐂𝐊 】▬▬▬🔵\n⚽ 𝗡𝗔𝗚𝗜 𝗕𝗔𝗖𝗛𝗜𝗥𝗔 𝗲𝗻𝘁𝗿𝗲 𝘀𝘂𝗿 𝗹𝗲 𝘁𝗲𝗿𝗿𝗮𝗶𝗻\n💤 « 𝙲̧𝚊 𝚊 𝚕'𝚊𝚒𝚛 𝚌𝚑𝚒𝚊𝚗𝚝... 𝚖𝚊𝚒𝚜 𝚘𝚔. »\n⚡ 𝙿𝚛𝚎́𝚏𝚒𝚡𝚎: %1\n🔎 𝙲𝚘𝚖𝚖𝚊𝚗𝚍𝚎𝚜: %1help\n🔵▬▬▬▬▬▬▬▬▬▬▬▬▬🔵",
-			multiple1: "🔹 𝚃𝚘𝚒",
-			multiple2: "🔹 𝚅𝚘𝚞𝚜 𝚝𝚘𝚞𝚜",
-			defaultWelcomeMessage: "🔵▬▬▬【 𝐁𝐋𝐔𝐄 𝐋𝐎𝐂𝐊 】▬▬▬🔵\n⚽ 𝙽𝙾𝚄𝚅𝙴𝙰𝚄 𝙹𝙾𝚄𝙴𝚄𝚁 𝚂𝙴́𝙻𝙴𝙲𝚃𝙸𝙾𝙽𝙽𝙴́\n👤 ✨{userName}✨\n🏟️ 𝙱𝚒𝚎𝚗𝚟𝚎𝚗𝚞𝚎 {multiple} 𝚍𝚊𝚗𝚜: {boxName}\n🌙 𝙿𝚊𝚜𝚜𝚎 𝚞𝚗 𝚋𝚘𝚗 {session}\n📥 𝙰𝚓𝚘𝚞𝚝𝚎́ 𝚙𝚊𝚛: ✨{adderName}✨\n💤 𝙽𝚊𝚐𝚒: « 𝙵𝚊𝚒𝚜 𝚙𝚊𝚜 𝚌𝚘𝚖𝚙𝚕𝚒𝚚𝚞𝚎́. »\n🔵▬▬▬▬▬▬▬▬▬▬▬▬▬🔵"
-		}
-	},
+    onStart: async function () {},
 
-	onStart: async ({ threadsData, message, event, api, getLang }) => {
-		if (event.logMessageType !== "log:subscribe") return;
+    // GoatBot appelle onEvent pour tous les événements du thread
+    onEvent: async function ({ api, event, threadsData, usersData }) {
+        if (event.logMessageType !== "log:subscribe") return;
 
-		const { threadID, logMessageData } = event;
-		const { addedParticipants } = logMessageData;
-		const hours = getTime("HH");
-		const prefix = global.utils.getPrefix(threadID);
-		const nickNameBot = global.GoatBot.config.nickNameBot;
+        const { threadID, logMessageData, author } = event;
+        const { addedParticipants } = logMessageData;
 
-		// 🔵 Le bot vient d'être ajouté : message + photos Nagi Bachira
-		if (addedParticipants.some(user => user.userFbId === api.getCurrentUserID())) {
-			if (nickNameBot) api.changeNickname(nickNameBot, threadID, api.getCurrentUserID());
-			const attachment = await getNagiStreams();
-			return message.send({
-				body: getLang("welcomeMessage", prefix),
-				attachment: attachment.length ? attachment : undefined
-			});
-		}
+        // Récupérer le nom du groupe pour l'afficher sur le Canvas
+        const threadInfo = await threadsData.get(threadID) || {};
+        const threadName = threadInfo.threadName || "ce groupe";
 
-		if (!global.temp.welcomeEvent[threadID]) {
-			global.temp.welcomeEvent[threadID] = { joinTimeout: null, dataAddedParticipants: [] };
-		}
+        // Récupérer la photo de profil du groupe (si définie)
+        let groupAvatarImg = null;
+        if (threadInfo.imageSrc) {
+            try {
+                const responseGroupAvatar = await axios.get(threadInfo.imageSrc, {
+                    responseType: 'arraybuffer',
+                    maxRedirects: 5
+                });
+                groupAvatarImg = await loadImage(Buffer.from(responseGroupAvatar.data));
+            } catch (e) {
+                console.error("Impossible de récupérer la photo du groupe :", e);
+            }
+        }
 
-		global.temp.welcomeEvent[threadID].dataAddedParticipants.push(...addedParticipants);
-		clearTimeout(global.temp.welcomeEvent[threadID].joinTimeout);
+        // Récupérer le nom de la personne qui a ajouté le·s nouveau·x membre·s
+        let inviterName = "quelqu'un";
+        let inviterAvatarImg = null;
+        try {
+            const inviterInfo = await usersData.get(author);
+            inviterName = (inviterInfo && inviterInfo.name) || inviterName;
 
-		global.temp.welcomeEvent[threadID].joinTimeout = setTimeout(async () => {
-			const threadData = await threadsData.get(threadID);
-			if (threadData.settings.sendWelcomeMessage === false) return;
+            const inviterAvatarUrl = `https://graph.facebook.com/${author}/picture?width=200&height=200&access_token=6628568379%7Cc1e620fa708a1d5696fb991c1bde5662`;
+            const responseInviterAvatar = await axios.get(inviterAvatarUrl, {
+                responseType: 'arraybuffer',
+                maxRedirects: 5
+            });
+            inviterAvatarImg = await loadImage(Buffer.from(responseInviterAvatar.data));
+        } catch (e) {
+            console.error("Impossible de récupérer les infos de l'auteur de l'ajout :", e);
+        }
 
-			const dataAddedParticipants = global.temp.welcomeEvent[threadID].dataAddedParticipants;
-			const bannedUsers = threadData.data.banned_ban || [];
-			const threadName = threadData.threadName;
+        // Date et heure formatées en français
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' });
+        const timeStr = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
-			let newMembers = [], mentions = [];
-			const isMultiple = dataAddedParticipants.length > 1;
+        for (let participant of addedParticipants) {
+            const userID = participant.userFbId;
+            const fullName = participant.fullName;
 
-			for (const user of dataAddedParticipants) {
-				if (bannedUsers.some(banned => banned.id === user.userFbId)) continue;
-				newMembers.push(user.fullName);
-				mentions.push({ tag: user.fullName, id: user.userFbId });
-			}
+            // Ignorer si c'est le bot lui-même qui rejoint
+            if (userID == api.getCurrentUserID()) continue;
 
-			if (newMembers.length === 0) return;
+            try {
+                // 1. Récupération de l'avatar Facebook haute résolution
+                // Correction : il manquait "https://graph." et le "$" du template literal
+                const avatarUrl = `https://graph.facebook.com/${userID}/picture?width=500&height=500&access_token=6628568379%7Cc1e620fa708a1d5696fb991c1bde5662`;
 
-			const adderID = event.author;
-			const adderInfo = await api.getUserInfo(adderID);
-			const adderName = adderInfo[adderID]?.name || "Quelqu'un";
-			mentions.push({ tag: adderName, id: adderID });
+                const responseAvatar = await axios.get(avatarUrl, {
+                    responseType: 'arraybuffer',
+                    // Certains CDN redirigent, on suit les redirections
+                    maxRedirects: 5
+                });
+                const avatarImg = await loadImage(Buffer.from(responseAvatar.data));
 
-			let welcomeMessage = threadData.data.welcomeMessage || getLang("defaultWelcomeMessage");
+                // 2. Initialisation de la zone de dessin (1024x500)
+                const canvas = createCanvas(1024, 500);
+                const ctx = canvas.getContext('2d');
 
-			welcomeMessage = welcomeMessage
-				.replace(/\{userName\}|\{userNameTag\}/g, newMembers.join(", "))
-				.replace(/\{boxName\}|\{threadName\}/g, threadName)
-				.replace(/\{multiple\}/g, isMultiple ? getLang("multiple2") : getLang("multiple1"))
-				.replace(/\{session\}/g,
-					hours <= 10 ? getLang("session1") :
-					hours <= 12 ? getLang("session2") :
-					hours <= 18 ? getLang("session3") : getLang("session4")
-				)
-				.replace(/\{adderName\}/g, adderName);
+                // 3. Image de fond personnalisée
+                const backgroundUrl = "https://i.ibb.co/jkgq4Nzt/a8364c99e94a.jpg";
+                const responseBg = await axios.get(backgroundUrl, {
+                    responseType: 'arraybuffer',
+                    maxRedirects: 5
+                });
+                const bgImg = await loadImage(Buffer.from(responseBg.data));
 
-			const form = { body: welcomeMessage, mentions };
+                // On dessine l'image en "cover" pour qu'elle remplisse tout le canvas
+                // sans être déformée, quel que soit son ratio d'origine
+                const canvasRatio = canvas.width / canvas.height;
+                const imgRatio = bgImg.width / bgImg.height;
+                let drawWidth, drawHeight, drawX, drawY;
 
-			if (threadData.data.welcomeAttachment) {
-				const files = threadData.data.welcomeAttachment;
-				const attachments = files.map(file => drive.getFile(file, "stream"));
-				form.attachment = (await Promise.allSettled(attachments))
-					.filter(({ status }) => status === "fulfilled")
-					.map(({ value }) => value);
-			} else {
-				const nagi = await getNagiStreams();
-				if (nagi.length) form.attachment = nagi;
-			}
+                if (imgRatio > canvasRatio) {
+                    drawHeight = canvas.height;
+                    drawWidth = bgImg.width * (canvas.height / bgImg.height);
+                    drawX = (canvas.width - drawWidth) / 2;
+                    drawY = 0;
+                } else {
+                    drawWidth = canvas.width;
+                    drawHeight = bgImg.height * (canvas.width / bgImg.width);
+                    drawX = 0;
+                    drawY = (canvas.height - drawHeight) / 2;
+                }
 
-			message.send(form);
-			delete global.temp.welcomeEvent[threadI
-                                D];
-		}, 1500);
-	}
+                ctx.drawImage(bgImg, drawX, drawY, drawWidth, drawHeight);
+
+                // Voile sombre semi-transparent par-dessus pour garder les textes lisibles
+                ctx.fillStyle = 'rgba(10, 8, 20, 0.55)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Cercles décoratifs néon en arrière-plan
+                ctx.fillStyle = 'rgba(122, 79, 240, 0.15)';
+                ctx.beginPath(); ctx.arc(900, 100, 200, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = 'rgba(0, 242, 254, 0.1)';
+                ctx.beginPath(); ctx.arc(100, 400, 150, 0, Math.PI * 2); ctx.fill();
+
+                // 3bis. Photo de profil du groupe + nom du groupe (en haut à gauche)
+                if (groupAvatarImg) {
+                    const grpX = 70, grpY = 60, grpRadius = 32;
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.arc(grpX, grpY, grpRadius, 0, Math.PI * 2);
+                    ctx.closePath();
+                    ctx.clip();
+                    ctx.drawImage(
+                        groupAvatarImg,
+                        grpX - grpRadius,
+                        grpY - grpRadius,
+                        grpRadius * 2,
+                        grpRadius * 2
+                    );
+                    ctx.restore();
+
+                    ctx.strokeStyle = '#00f2fe';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(grpX, grpY, grpRadius, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+
+                ctx.textAlign = 'left';
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 20px Arial';
+                ctx.fillText(threadName, groupAvatarImg ? 115 : 40, 55);
+                ctx.fillStyle = '#a0a0c0';
+                ctx.font = '14px Arial';
+                ctx.fillText("Groupe", groupAvatarImg ? 115 : 40, 75);
+
+                // 4. Masque circulaire + dessin de l'avatar (X: 512, Y: 180, rayon 100)
+                const avatarX = 512, avatarY = 180, avatarRadius = 100;
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(avatarX, avatarY, avatarRadius, 0, Math.PI * 2);
+                ctx.closePath();
+                ctx.clip();
+                // On dessine l'image exactement dans le carré englobant le cercle,
+                // ce qui garantit qu'elle est bien centrée peu importe son ratio d'origine
+                ctx.drawImage(
+                    avatarImg,
+                    avatarX - avatarRadius,
+                    avatarY - avatarRadius,
+                    avatarRadius * 2,
+                    avatarRadius * 2
+                );
+                ctx.restore();
+
+                // Contour lumineux autour de l'avatar
+                ctx.strokeStyle = '#00f2fe';
+                ctx.lineWidth = 6;
+                ctx.beginPath();
+                ctx.arc(avatarX, avatarY, avatarRadius, 0, Math.PI * 2);
+                ctx.stroke();
+
+                // 5. Textes
+                ctx.textAlign = 'center';
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 36px Arial';
+                ctx.fillText("BIENVENUE !", 512, 330);
+
+                ctx.fillStyle = '#00f2fe';
+                ctx.font = 'bold 42px Arial';
+                ctx.fillText(fullName, 512, 390);
+
+                ctx.fillStyle = '#a0a0c0';
+                ctx.font = 'italic 24px Arial';
+                ctx.fillText(`Bienvenue dans : ${threadName}`, 512, 440);
+
+                // 5bis. Petit avatar de la personne qui a ajouté le membre (en bas à gauche)
+                if (inviterAvatarImg) {
+                    const invX = 90, invY = 460, invRadius = 35;
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.arc(invX, invY, invRadius, 0, Math.PI * 2);
+                    ctx.closePath();
+                    ctx.clip();
+                    ctx.drawImage(
+                        inviterAvatarImg,
+                        invX - invRadius,
+                        invY - invRadius,
+                        invRadius * 2,
+                        invRadius * 2
+                    );
+                    ctx.restore();
+
+                    ctx.strokeStyle = '#7a4ff0';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(invX, invY, invRadius, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+
+                // Texte "Ajouté par" à côté du petit avatar
+                ctx.textAlign = 'left';
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '18px Arial';
+                ctx.fillText(`Ajouté par : ${inviterName}`, 140, 455);
+
+                // Date et heure en bas à droite
+                ctx.textAlign = 'right';
+                ctx.fillStyle = '#a0a0c0';
+                ctx.font = '16px Arial';
+                ctx.fillText(dateStr, 934, 450);
+                ctx.fillText(timeStr, 934, 470);
+
+                // 6. Cache temporaire et envoi
+                const cachePath = path.join(__dirname, `cache/welcome_${userID}.png`);
+                await fs.ensureDir(path.dirname(cachePath));
+                await fs.outputFile(cachePath, canvas.toBuffer());
+
+                const msg = {
+                    body: `Bienvenue ${fullName} ! Prends soin de lire le règlement du groupe.`,
+                    attachment: fs.createReadStream(cachePath)
+                };
+
+                api.sendMessage(msg, threadID, (err) => {
+                    if (fs.existsSync(cachePath)) fs.unlinkSync(cachePath);
+                    if (err) console.error("Erreur d'envoi :", err);
+                });
+
+            } catch (error) {
+                console.error("Erreur lors de la génération de la Welcome Card :", error);
+                api.sendMessage(`Bienvenue ${fullName} dans le groupe !`, threadID);
+            }
+        }
+    }
 };
