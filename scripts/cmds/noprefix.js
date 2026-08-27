@@ -11,7 +11,8 @@ module.exports = {
 		role: 6,
 		description: {
 			vi: "Thêm, xóa quyền dùng lệnh không cần prefix",
-			en: "Add, remove permission to use commands without prefix"
+			en: "Add, remove permission to use commands without prefix",
+			fr: "Ajouter, retirer la permission d'utiliser les commandes sans préfixe"
 		},
 		category: "owner",
 		guide: {
@@ -26,7 +27,13 @@ module.exports = {
 				+ '\n   {pn} [list | -l]: List all noprefix users'
 				+ '\n   {pn} [check | -c] <uid | @tag>: Check if a user has noprefix permission'
 				+ '\n   {pn} on: Turn ON the noprefix feature'
-				+ '\n   {pn} off: Turn OFF the noprefix feature'
+				+ '\n   {pn} off: Turn OFF the noprefix feature',
+			fr: '   {pn} [add | -a] <uid | @tag> : Donner la permission noprefix à un utilisateur'
+				+ '\n   {pn} [remove | -r] <uid | @tag> : Retirer la permission noprefix d\'un utilisateur'
+				+ '\n   {pn} [list | -l] : Afficher la liste des utilisateurs noprefix'
+				+ '\n   {pn} [check | -c] <uid | @tag> : Vérifier si un utilisateur a la permission noprefix'
+				+ '\n   {pn} on : Activer la fonctionnalité noprefix'
+				+ '\n   {pn} off : Désactiver la fonctionnalité noprefix'
 		}
 	},
 
@@ -64,6 +71,23 @@ module.exports = {
 			turnedOff: "✓ | Noprefix feature is now OFF, everyone must use the prefix to call commands",
 			alreadyOn: "⚠ | Noprefix feature is already ON",
 			alreadyOff: "⚠ | Noprefix feature is already OFF"
+		},
+		fr: {
+			added: "✓ | Permission noprefix ajoutée pour %1 utilisateur(s) :\n%2",
+			alreadyNoPrefix: "\n⚠ | %1 utilisateur(s) avaient déjà la permission noprefix :\n%2",
+			missingIdAdd: "⚠ | Merci d'indiquer l'ID ou de tag l'utilisateur à qui donner la permission noprefix",
+			removed: "✓ | Permission noprefix retirée pour %1 utilisateur(s) :\n%2",
+			notNoPrefix: "⚠ | %1 utilisateur(s) n'ont pas la permission noprefix :\n%2",
+			missingIdRemove: "⚠ | Merci d'indiquer l'ID ou de tag l'utilisateur à qui retirer la permission noprefix",
+			listNoPrefix: "★ | Liste des utilisateurs noprefix :\n%1",
+			listEmpty: "★ | Personne n'a la permission noprefix pour le moment",
+			checkInfo: "✓ | %1 (%2) %3 la permission d'utiliser les commandes sans préfixe",
+			checkYes: "a",
+			checkNo: "n'a pas",
+			turnedOn: "✓ | Fonctionnalité noprefix ACTIVÉE, les admins du bot et les utilisateurs listés peuvent utiliser les commandes sans préfixe",
+			turnedOff: "✓ | Fonctionnalité noprefix DÉSACTIVÉE, tout le monde doit utiliser le préfixe pour appeler les commandes",
+			alreadyOn: "⚠ | La fonctionnalité noprefix est déjà activée",
+			alreadyOff: "⚠ | La fonctionnalité noprefix est déjà désactivée"
 		}
 	},
 
@@ -188,4 +212,3 @@ module.exports = {
 		}
 	}
 };
-                
