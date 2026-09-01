@@ -5,247 +5,476 @@ module.exports = {
   config: {
     name: "push",
     aliases: ["file", "explore", "folder", "f"],
-    version: "1.4",
+    version: "2.0",
     author: "Camille Uchiha",
     countDown: 3,
-    role: 2, // 2 = Administrateurs du Bot
+    role: 2,
+
     description: {
-      en: "Explore, view, or delete bot system files and directories from the chat",
-      fr: "Explorer, lire ou supprimer des fichiers et dossiers du système du bot depuis le chat"
+      en: "Explore, read and manage bot files",
+      fr: "Explorer, lire et gérer les fichiers du bot"
     },
+
     category: "admin",
+
     guide: {
-      en: "Use:\n{pn} : List root files\n{pn} [folder] : Browse a folder (add p2, p3... for pages)\n{pn} view [filename] : View file content\n{pn} search [term] : Search files by name\n{pn} delete [filename] : Delete a file\n{pn} delete confirm [folder] : Delete a folder (requires confirm)\n{pn} back : Go up one folder",
-      fr: "Utilisation :\n{pn} : Lister la racine\n{pn} [dossier] : Explorer un dossier (ajoute p2, p3... pour paginer)\n{pn} view [nom_fichier] : Lire le contenu d'un fichier\n{pn} search [terme] : Rechercher des fichiers par nom\n{pn} delete [nom_fichier] : Supprimer un fichier\n{pn} delete confirm [dossier] : Supprimer un dossier (confirmation requise)\n{pn} back : Remonter d'un dossier"
+      en:
+        "{pn} → Explore\n" +
+        "{pn} [folder] → Open folder\n" +
+        "{pn} view [file] → Read file\n" +
+        "{pn} delete [file] → Delete",
+
+      fr:
+        "{pn} → Explorer\n" +
+        "{pn} [dossier] → Ouvrir\n" +
+        "{pn} view [fichier] → Lire\n" +
+        "{pn} delete [fichier] → Supprimer"
     }
   },
 
   onStart: async function ({ message, args }) {
+
     const rootPath = path.resolve("./");
-    let action = (args[0] || "").toLowerCase();
 
-    const formatSize = (bytes) => {
-      if (bytes < 1024) return `${bytes} o`;
-      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} Ko`;
-      return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
-    };
+    // ═══════════════════════════════════════
+    // 𝙉𝘼𝙂𝙄 × 𝘽𝘼𝘾𝙃𝙄𝙍𝘼
+    // ═══════════════════════════════════════
 
-    const ICONS = {
-      ".js": "🟨", ".json": "🗂️", ".md": "📝", ".txt": "📃",
-      ".png": "🖼️", ".jpg": "🖼️", ".jpeg": "🖼️", ".gif": "🖼️", ".webp": "🖼️",
-      ".env": "🔐", ".css": "🎨", ".html": "🌐", ".log": "🧾"
-    };
-    const iconFor = (item, isDir) => {
-      if (isDir) return "📁";
-      return ICONS[path.extname(item).toLowerCase()] || "📄";
-    };
-
-    const PAGE_SIZE = 20;
-
-    const box = (title, body, footer) => {
-      const line = "─".repeat(24);
-      let out = `╭${line}╮\n│  📦 ${title}\n╰${line}╯\n${body}`;
-      if (footer) out += `\n\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n💡 ${footer}`;
-      return out;
-    };
-
-    // --- ACTION : REMONTER D'UN DOSSIER ---
-    if (action === "back" || action === "..") {
-      const current = args.slice(1).join(" ");
-      const parent = path.dirname(current);
-      const newArgs = parent === "." ? [] : parent.split(path.sep);
-      return this.onStart({ message, args: newArgs });
+    function box(title, lines = []) {
+      return [
+        `╭━━━〔 ${title} 〕━━━╮`,
+        ...lines.map(line => `┃ ${line}`),
+        `╰━━━━━━━━━━━━━━━━━━━━╯`
+      ].join("\n");
     }
 
-    // --- ACTION : LIRE UN FICHIER ---
-    if (action === "view" || action === "read") {
-      const target = args.slice(1).join(" ");
-      if (!target) return message.reply("⚠️ Spécifiez le nom ou le chemin du fichier à lire.\n\n📌 Exemple : `push view scripts/cmds/help.js`");
-      const filePath = path.join(rootPath, target);
+    function error(text) {
+      return box("⚠️ 𝙀𝙍𝙍𝙀𝙐𝙍", [
+        "😴 𝙉𝙖𝙜𝙞 › Trop de problèmes...",
+        `🐝 𝘽𝙖𝙘𝙝𝙞𝙧𝙖 › ${text}`
+      ]);
+    }
 
-      if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
-        return message.reply("❌ Fichier introuvable ou il s'agit d'un dossier.");
+    function success(text) {
+      return box("⚡ 𝘼𝘾𝙏𝙄𝙊𝙉 𝙏𝙀𝙍𝙈𝙄𝙉𝙀́𝙀", [
+        `😴 𝙉𝙖𝙜𝙞 › ${text}`,
+        "🐝 𝘽𝙖𝙘𝙝𝙞𝙧𝙖 › Et maintenant... on continue !"
+      ]);
+    }
+
+    function safePath(input) {
+      if (!input) return rootPath;
+
+      const target = path.resolve(rootPath, input);
+
+      if (
+        target !== rootPath &&
+        !target.startsWith(rootPath + path.sep)
+      ) {
+        return null;
+      }
+
+      return target;
+    }
+
+    function formatSize(bytes) {
+      if (bytes < 1024) return `${bytes} B`;
+
+      if (bytes < 1024 * 1024)
+        return `${(bytes / 1024).toFixed(1)} KB`;
+
+      return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    }
+
+    // ═══════════════════════════════════════
+    // 📖 𝙇𝙀𝘾𝙏𝙐𝙍𝙀
+    // ═══════════════════════════════════════
+
+    if (args[0] === "view" || args[0] === "read") {
+
+      const target = args.slice(1).join(" ");
+
+      if (!target) {
+        return message.reply(
+          error("𝙄𝙡 𝙛𝙖𝙪𝙩 𝙙𝙤𝙣𝙣𝙚𝙧 𝙪𝙣 𝙛𝙞𝙘𝙝𝙞𝙚𝙧 𝙖̀ 𝙡𝙞𝙧𝙚.")
+        );
+      }
+
+      const filePath = safePath(target);
+
+      if (!filePath) {
+        return message.reply(
+          error("𝘾𝙚 𝙘𝙝𝙚𝙢𝙞𝙣 𝙚𝙨𝙩 𝙞𝙣𝙩𝙚𝙧𝙙𝙞𝙩.")
+        );
+      }
+
+      if (!fs.existsSync(filePath)) {
+        return message.reply(
+          error(`𝙁𝙞𝙘𝙝𝙞𝙚𝙧 𝙞𝙣𝙩𝙧𝙤𝙪𝙫𝙖𝙗𝙡𝙚 › ${target}`)
+        );
+      }
+
+      const stats = fs.statSync(filePath);
+
+      if (!stats.isFile()) {
+        return message.reply(
+          error("𝘾𝙚 𝙘𝙝𝙚𝙢𝙞𝙣 𝙘𝙤𝙧𝙧𝙚𝙨𝙥𝙤𝙣𝙙 𝙖̀ 𝙪𝙣 𝙙𝙤𝙨𝙨𝙞𝙚𝙧.")
+        );
       }
 
       try {
-        const content = fs.readFileSync(filePath, "utf-8");
-        const stat = fs.statSync(filePath);
-        const header = `📄 ${path.basename(target)}  •  ${formatSize(stat.size)}  •  ${content.split("\n").length} lignes`;
 
-        if (content.length > 3900) {
-          const tempPath = path.join(rootPath, "scripts", "cmds", "cache", `view_${path.basename(filePath)}.txt`);
-          fs.ensureDirSync(path.dirname(tempPath));
-          fs.writeFileSync(tempPath, content);
-          return message.reply({
-            body: box(header, "Fichier trop long pour être affiché ici, envoyé en pièce jointe ⬇️"),
+        const content = fs.readFileSync(filePath, "utf8");
+
+        const header = box("📖 𝙇𝙀𝘾𝙏𝙐𝙍𝙀", [
+          `📌 𝙁𝙞𝙘𝙝𝙞𝙚𝙧 › ${target}`,
+          `📦 𝙏𝙖𝙞𝙡𝙡𝙚 › ${formatSize(stats.size)}`,
+          `📝 𝙇𝙞𝙜𝙣𝙚𝙨 › ${content.split("\n").length}`,
+          "🐝 𝘽𝙖𝙘𝙝𝙞𝙧𝙖 › Voyons ce qu'il cache..."
+        ]);
+
+        if (content.length <= 3500) {
+
+          return message.reply(
+            `${header}\n\n` +
+            `╭━━〔 📜 𝘾𝙊𝙉𝙏𝙀𝙉𝙐 〕━━╮\n` +
+            `${content}\n` +
+            `╰━━━━━━━━━━━━━━━━━━━╯`
+          );
+        }
+
+        const cacheDir = path.join(
+          rootPath,
+          "scripts",
+          "cmds",
+          "cache"
+        );
+
+        await fs.ensureDir(cacheDir);
+
+        const safeName =
+          path.basename(filePath)
+            .replace(/[^\w.-]/g, "_");
+
+        const tempPath = path.join(
+          cacheDir,
+          `push_${Date.now()}_${safeName}.txt`
+        );
+
+        await fs.writeFile(tempPath, content, "utf8");
+
+        return message.reply(
+          {
+            body:
+              `${header}\n\n` +
+              "📎 𝙁𝙞𝙘𝙝𝙞𝙚𝙧 𝙩𝙧𝙤𝙥 𝙡𝙤𝙣𝙜.\n" +
+              "🐝 𝘽𝙖𝙘𝙝𝙞𝙧𝙖 › Voilà tout le fichier !",
             attachment: fs.createReadStream(tempPath)
-          }, () => {
-            if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+          },
+          async () => {
+            try {
+              await fs.remove(tempPath);
+            } catch {}
+          }
+        );
+
+      } catch (e) {
+
+        return message.reply(
+          error(`𝙀𝙧𝙧𝙚𝙪𝙧 𝙙𝙚 𝙡𝙚𝙘𝙩𝙪𝙧𝙚 › ${e.message}`)
+        );
+      }
+    }
+
+    // ═══════════════════════════════════════
+    // 🗑️ 𝙎𝙐𝙋𝙋𝙍𝙀𝙎𝙎𝙄𝙊𝙉
+    // ═══════════════════════════════════════
+
+    if (
+      args[0] === "delete" ||
+      args[0] === "del" ||
+      args[0] === "remove"
+    ) {
+
+      const target = args.slice(1).join(" ");
+
+      if (!target) {
+        return message.reply(
+          error("𝙎𝙥𝙚́𝙘𝙞𝙛𝙞𝙚 𝙡'𝙚́𝙡𝙚́𝙢𝙚𝙣𝙩 𝙖̀ 𝙨𝙪𝙥𝙥𝙧𝙞𝙢𝙚𝙧.")
+        );
+      }
+
+      const filePath = safePath(target);
+
+      if (!filePath) {
+        return message.reply(
+          error("𝘾𝙝𝙚𝙢𝙞𝙣 𝙞𝙣𝙩𝙚𝙧𝙙𝙞𝙩.")
+        );
+      }
+
+      if (!fs.existsSync(filePath)) {
+        return message.reply(
+          error(`𝙄𝙣𝙩𝙧𝙤𝙪𝙫𝙖𝙗𝙡𝙚 › ${target}`)
+        );
+      }
+
+      const protectedFiles = [
+        "index.js",
+        "package.json",
+        "config.json",
+        ".env"
+      ];
+
+      if (protectedFiles.includes(path.basename(filePath))) {
+
+        return message.reply(
+          box("🛡️ 𝙋𝙍𝙊𝙏𝙀𝘾𝙏𝙄𝙊𝙉", [
+            "😴 𝙉𝙖𝙜𝙞 › Non.",
+            `📌 ${target}`,
+            "🐝 𝘽𝙖𝙘𝙝𝙞𝙧𝙖 › Celui-là reste en place !",
+            "🔒 𝙁𝙞𝙘𝙝𝙞𝙚𝙧 𝙥𝙧𝙤𝙩𝙚́𝙜𝙚́."
+          ])
+        );
+      }
+
+      try {
+
+        const stats = fs.statSync(filePath);
+
+        await fs.remove(filePath);
+
+        return message.reply(
+          success(
+            `${stats.isDirectory() ? "𝘿𝙤𝙨𝙨𝙞𝙚𝙧" : "𝙁𝙞𝙘𝙝𝙞𝙚𝙧"} ` +
+            `\`${target}\` 𝙨𝙪𝙥𝙥𝙧𝙞𝙢𝙚́.`
+          )
+        );
+
+      } catch (e) {
+
+        return message.reply(
+          error(`𝙎𝙪𝙥𝙥𝙧𝙚𝙨𝙨𝙞𝙤𝙣 𝙞𝙢𝙥𝙤𝙨𝙨𝙞𝙗𝙡𝙚 › ${e.message}`)
+        );
+      }
+    }
+
+    // ═══════════════════════════════════════
+    // 📚 𝘼𝙄𝘿𝙀
+    // ═══════════════════════════════════════
+
+    if (
+      args[0] === "help" ||
+      args[0] === "h" ||
+      args[0] === "?"
+    ) {
+
+      return message.reply(
+        box("🐝 𝙉𝘼𝙂𝙄 × 𝘽𝘼𝘾𝙃𝙄𝙍𝘼 😴", [
+          "😴 𝙉𝙖𝙜𝙞 › Voilà les commandes...",
+          "",
+          "📂 𝙥𝙪𝙨𝙝",
+          "└─ Explorer la racine",
+          "",
+          "📁 𝙥𝙪𝙨𝙝 [𝙙𝙤𝙨𝙨𝙞𝙚𝙧]",
+          "└─ Ouvrir un dossier",
+          "",
+          "📖 𝙥𝙪𝙨𝙝 𝙫𝙞𝙚𝙬 [𝙛𝙞𝙘𝙝𝙞𝙚𝙧]",
+          "└─ Lire un fichier",
+          "",
+          "🗑️ 𝙥𝙪𝙨𝙝 𝙙𝙚𝙡𝙚𝙩𝙚 [𝙛𝙞𝙘𝙝𝙞𝙚𝙧]",
+          "└─ Supprimer",
+          "",
+          "🐝 𝘽𝙖𝙘𝙝𝙞𝙧𝙖 › Cherche ton monstre !",
+          "🔐 𝘼𝙘𝙘𝙚̀𝙨 › 𝘼𝙙𝙢𝙞𝙣𝙨 𝘽𝙤𝙩"
+        ])
+      );
+    }
+
+    // ═══════════════════════════════════════
+    // 🔎 𝙀𝙓𝙋𝙇𝙊𝙍𝘼𝙏𝙄𝙊𝙉
+    // ═══════════════════════════════════════
+
+    const input = args.join(" ");
+    let currentPath = safePath(input);
+
+    if (!currentPath) {
+      return message.reply(
+        error("𝘾𝙝𝙚𝙢𝙞𝙣 𝙞𝙣𝙩𝙚𝙧𝙙𝙞𝙩.")
+      );
+    }
+
+    if (
+      fs.existsSync(currentPath) &&
+      fs.statSync(currentPath).isFile()
+    ) {
+
+      return this.onStart({
+        message,
+        args: ["view", ...args]
+      });
+    }
+
+    if (
+      !fs.existsSync(currentPath) &&
+      !path.extname(input)
+    ) {
+
+      const jsPath = safePath(`${input}.js`);
+
+      if (
+        jsPath &&
+        fs.existsSync(jsPath) &&
+        fs.statSync(jsPath).isFile()
+      ) {
+
+        return this.onStart({
+          message,
+          args: [
+            "view",
+            ...args.slice(0, -1),
+            `${args[args.length - 1]}.js`
+          ]
+        });
+      }
+    }
+
+    if (!fs.existsSync(currentPath)) {
+
+      return message.reply(
+        error(
+          `𝘿𝙤𝙨𝙨𝙞𝙚𝙧 𝙞𝙣𝙩𝙧𝙤𝙪𝙫𝙖𝙗𝙡𝙚 › ${input}\n` +
+          "💡 Exemple › 𝙥𝙪𝙨𝙝 𝙨𝙘𝙧𝙞𝙥𝙩𝙨/𝙘𝙢𝙙𝙨"
+        )
+      );
+    }
+
+    if (!fs.statSync(currentPath).isDirectory()) {
+
+      return message.reply(
+        error("𝘾𝙚 𝙣'𝙚𝙨𝙩 𝙥𝙖𝙨 𝙪𝙣 𝙙𝙤𝙨𝙨𝙞𝙚𝙧.")
+      );
+    }
+
+    return explore(currentPath, input);
+
+    // ═══════════════════════════════════════
+    // 📂 𝙀𝙓𝙋𝙇𝙊𝙍𝘼𝙏𝙀𝙐𝙍
+    // ═══════════════════════════════════════
+
+    async function explore(directory, displayPath) {
+
+      try {
+
+        const items = await fs.readdir(directory);
+
+        if (items.length === 0) {
+
+          return message.reply(
+            box("📂 𝘿𝙊𝙎𝙎𝙄𝙀𝙍 𝙑𝙄𝘿𝙀", [
+              `📍 ${displayPath || "𝙍𝘼𝘾𝙄𝙉𝙀"}`,
+              "😴 𝙉𝙖𝙜𝙞 › Rien ici...",
+              "🐝 𝘽𝙖𝙘𝙝𝙞𝙧𝙖 › On cherche ailleurs !"
+            ])
+          );
+        }
+
+        const folders = [];
+        const files = [];
+
+        for (const item of items) {
+
+          const itemPath = path.join(
+            directory,
+            item
+          );
+
+          try {
+
+            const stats = await fs.stat(itemPath);
+
+            if (stats.isDirectory()) {
+              folders.push(item);
+            } else {
+              files.push({
+                name: item,
+                size: stats.size
+              });
+            }
+
+          } catch {}
+        }
+
+        folders.sort((a, b) =>
+          a.localeCompare(b)
+        );
+
+        files.sort((a, b) =>
+          a.name.localeCompare(b.name)
+        );
+
+        const lines = [];
+
+        lines.push(
+          `📍 𝙋𝘼𝙏𝙃 › ${displayPath || "𝙍𝘼𝘾𝙄𝙉𝙀"}`,
+          `📊 ${folders.length} 𝙙𝙤𝙨𝙨𝙞𝙚𝙧(𝙨) • ${files.length} 𝙛𝙞𝙘𝙝𝙞𝙚𝙧(𝙨)`,
+          ""
+        );
+
+        if (folders.length) {
+
+          lines.push("📁 𝘿𝙊𝙎𝙎𝙄𝙀𝙍𝙎");
+
+          folders.forEach((folder, index) => {
+
+            const last =
+              index === folders.length - 1;
+
+            lines.push(
+              `${last ? "└" : "├"}─ 📁 ${folder}`
+            );
+          });
+
+          lines.push("");
+        }
+
+        if (files.length) {
+
+          lines.push("📄 𝙁𝙄𝘾𝙃𝙄𝙀𝙍𝙎");
+
+          files.forEach((file, index) => {
+
+            const last =
+              index === files.length - 1;
+
+            lines.push(
+              `${last ? "└" : "├"}─ 📄 ${file.name} • ${formatSize(file.size)}`
+            );
           });
         }
-        const parentDir = path.dirname(target);
-        const backCmd = parentDir === "." ? "push" : `push ${parentDir}`;
-        return message.reply(box(header, `\`\`\`text\n${content}\n\`\`\``, `Retour : \`${backCmd}\``));
+
+        lines.push(
+          "",
+          "━━━━━━━━━━━━━━━━━━━━",
+          "😴 𝙉𝙖𝙜𝙞 › Trop de fichiers...",
+          "🐝 𝘽𝙖𝙘𝙝𝙞𝙧𝙖 › Alors trouvons le monstre !",
+          "",
+          "💡 𝙥𝙪𝙨𝙝 [𝙣𝙤𝙢] › ouvrir",
+          "📖 𝙥𝙪𝙨𝙝 𝙫𝙞𝙚𝙬 [𝙛𝙞𝙘𝙝𝙞𝙚𝙧] › lire",
+          "🗑️ 𝙥𝙪𝙨𝙝 𝙙𝙚𝙡𝙚𝙩𝙚 [𝙛𝙞𝙘𝙝𝙞𝙚𝙧] › supprimer"
+        );
+
+        return message.reply(
+          box("😴 𝙉𝘼𝙂𝙄 × 🐝 𝘽𝘼𝘾𝙃𝙄𝙍𝘼", lines)
+        );
+
       } catch (e) {
-        return message.reply(`❌ Erreur lors de la lecture : ${e.message}`);
+
+        return message.reply(
+          error(
+            `𝙀𝙧𝙧𝙚𝙪𝙧 𝙙'𝙚𝙭𝙥𝙡𝙤𝙧𝙖𝙩𝙞𝙤𝙣 › ${e.message}`
+          )
+        );
       }
-    }
-
-    // --- ACTION : SUPPRIMER UN FICHIER ---
-    if (action === "delete" || action === "del") {
-      let rest = args.slice(1);
-      const confirmed = rest[0] === "confirm";
-      if (confirmed) rest = rest.slice(1);
-      const target = rest.join(" ");
-
-      if (!target) return message.reply("⚠️ Spécifiez le fichier ou dossier à supprimer.");
-      const filePath = path.join(rootPath, target);
-
-      if (!fs.existsSync(filePath)) return message.reply("❌ Fichier ou dossier introuvable.");
-
-      const protectedPaths = ["index.js", "package.json", "config.json", "node_modules", ".git", "scripts/cmds"];
-      if (protectedPaths.includes(target)) {
-        return message.reply("🚫 Action refusée : cet élément est vital pour la survie du bot.");
-      }
-
-      const isDir = fs.statSync(filePath).isDirectory();
-
-      // Sécurité : un dossier doit être confirmé explicitement
-      if (isDir && !confirmed) {
-        const count = fs.readdirSync(filePath).length;
-        return message.reply(box(
-          "⚠️ Confirmation requise",
-          `Tu es sur le point de supprimer le dossier \`${target}\` (${count} élément(s)) et TOUT son contenu, sans retour possible.`,
-          `Pour confirmer : \`push delete confirm ${target}\``
-        ));
-      }
-
-      try {
-        fs.removeSync(filePath);
-        return message.reply(box(
-          "Suppression réussie",
-          `${isDir ? "📁" : "📄"} \`${target}\`\nSupprimé définitivement.`
-        ));
-      } catch (e) {
-        return message.reply(`❌ Impossible de supprimer : ${e.message}`);
-      }
-    }
-
-    // --- ACTION : RECHERCHER UN FICHIER ---
-    if (action === "search" || action === "find") {
-      const term = args.slice(1).join(" ").toLowerCase();
-      if (!term) return message.reply("⚠️ Spécifiez un terme à rechercher.\n\n📌 Exemple : `push search wanted`");
-
-      const results = [];
-      const IGNORED = new Set(["node_modules", ".git", "cache"]);
-      const walk = (dir, relDir) => {
-        if (results.length >= 30) return;
-        let entries;
-        try { entries = fs.readdirSync(dir); } catch { return; }
-        for (const entry of entries) {
-          if (IGNORED.has(entry)) continue;
-          const full = path.join(dir, entry);
-          const rel = relDir ? `${relDir}/${entry}` : entry;
-          const stat = fs.statSync(full);
-          if (entry.toLowerCase().includes(term)) {
-            results.push(`  ${iconFor(entry, stat.isDirectory())} ${rel}`);
-          }
-          if (stat.isDirectory() && results.length < 30) walk(full, rel);
-        }
-      };
-      walk(rootPath, "");
-
-      if (results.length === 0) {
-        return message.reply(box("Recherche", `Aucun résultat pour \`${term}\`.`));
-      }
-      return message.reply(box(
-        `Recherche : "${term}"`,
-        `${results.length} résultat(s)${results.length >= 30 ? " (limité à 30)" : ""}\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n${results.join("\n")}`,
-        "`push view [chemin]` → ouvrir un résultat"
-      ));
-    }
-
-    // --- 🟢 LOGIQUE D'EXPLORATION ET REDIRECTION AUTO ---
-    // Extraction du numéro de page si présent (ex: "push scripts/cmds p2")
-    let pageArgs = [...args];
-    let pageNum = 1;
-    const lastArg = pageArgs[pageArgs.length - 1];
-    if (lastArg && /^p(age)?\d+$/i.test(lastArg)) {
-      pageNum = parseInt(lastArg.replace(/^p(age)?/i, ""), 10) || 1;
-      pageArgs = pageArgs.slice(0, -1);
-    }
-
-    const fullPathInput = pageArgs.join(" ");
-    let currentDir = fullPathInput ? path.join(rootPath, fullPathInput) : rootPath;
-
-    // Redirection intelligente : fichier saisi sans "view"
-    if (fs.existsSync(currentDir) && fs.statSync(currentDir).isFile()) {
-      pageArgs.unshift("view");
-      return this.onStart({ message, args: pageArgs });
-    }
-
-    // Nom sans extension .js
-    if (!fs.existsSync(currentDir) && fs.existsSync(currentDir + ".js")) {
-      pageArgs[pageArgs.length - 1] = pageArgs[pageArgs.length - 1] + ".js";
-      pageArgs.unshift("view");
-      return this.onStart({ message, args: pageArgs });
-    }
-
-    if (!fs.existsSync(currentDir) || !fs.statSync(currentDir).isDirectory()) {
-      return message.reply(box(
-        "Introuvable",
-        `❌ Le dossier \`${fullPathInput}\` n'existe pas.`,
-        "Pour voir les commandes : `push scripts/cmds`"
-      ));
-    }
-
-    try {
-      const items = fs.readdirSync(currentDir);
-      if (items.length === 0) {
-        return message.reply(box(fullPathInput || "RACINE", "📁 Ce dossier est vide."));
-      }
-
-      const folders = [];
-      const files = [];
-
-      items.forEach(item => {
-        const itemPath = path.join(currentDir, item);
-        const stat = fs.statSync(itemPath);
-        if (stat.isDirectory()) {
-          folders.push({ label: `  📁 ${item}/`, name: item });
-        } else {
-          files.push({ label: `  ${iconFor(item, false)} ${item}  ⟶  ${formatSize(stat.size)}`, name: item });
-        }
-      });
-
-      folders.sort((a, b) => a.name.localeCompare(b.name));
-      files.sort((a, b) => a.name.localeCompare(b.name));
-
-      const allEntries = [...folders, ...files].map(e => e.label);
-      const totalPages = Math.max(1, Math.ceil(allEntries.length / PAGE_SIZE));
-      const safePage = Math.min(Math.max(pageNum, 1), totalPages);
-      const pageEntries = allEntries.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
-
-      const breadcrumb = fullPathInput ? `📍 /${fullPathInput}` : "📍 / (racine)";
-      const pageInfo = totalPages > 1 ? `  •  page ${safePage}/${totalPages}` : "";
-      const body =
-        `${breadcrumb}\n` +
-        `${folders.length} dossier(s)  •  ${files.length} fichier(s)${pageInfo}\n` +
-        `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
-        pageEntries.join("\n");
-
-      const footerLines = [
-        "`push [dossier]` → ouvrir un dossier",
-        "💡 `push view [fichier]` → lire un fichier",
-        `💡 \`push back${fullPathInput ? " " + fullPathInput : ""}\` → remonter`
-      ];
-      if (totalPages > 1 && safePage < totalPages) {
-        footerLines.push(`➡️ \`push ${fullPathInput ? fullPathInput + " " : ""}p${safePage + 1}\` → page suivante`);
-      }
-
-      return message.reply(box("EXPLORATEUR", body, footerLines.join("\n")));
-    } catch (e) {
-      return message.reply(`❌ Erreur d'exploration : ${e.message}`);
     }
   }
 };
