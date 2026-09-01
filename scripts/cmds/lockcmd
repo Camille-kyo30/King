@@ -1,0 +1,183 @@
+const fs = require("fs-extra");
+const path = require("path");
+
+const DATA_DIR = path.join(process.cwd(), "data");
+const DATA_FILE = path.join(DATA_DIR, "commandLock.json");
+
+async function getState() {
+  await fs.ensureDir(DATA_DIR);
+
+  if (!fs.existsSync(DATA_FILE)) {
+    await fs.writeJson(DATA_FILE, {
+      locked: false
+    }, { spaces: 2 });
+  }
+
+  return fs.readJson(DATA_FILE);
+}
+
+async function setState(locked) {
+  await fs.ensureDir(DATA_DIR);
+
+  await fs.writeJson(DATA_FILE, {
+    locked
+  }, { spaces: 2 });
+}
+
+module.exports = {
+  config: {
+    name: "lockcmd",
+    aliases: ["cmdlock", "lock", "unlockcmd"],
+    version: "1.0",
+    author: "Camille Uchiha",
+    countDown: 3,
+    role: 2,
+
+    description: {
+      en: "Lock or unlock all bot commands",
+      fr: "Bloquer ou débloquer toutes les commandes du bot"
+    },
+
+    category: "admin",
+
+    guide: {
+      en:
+        "{pn} on → Lock all commands\n" +
+        "{pn} off → Unlock all commands\n" +
+        "{pn} status → Show current status",
+
+      fr:
+        "{pn} on → Bloquer toutes les commandes\n" +
+        "{pn} off → Débloquer toutes les commandes\n" +
+        "{pn} status → Voir le statut"
+    }
+  },
+
+  onStart: async function ({ message, args }) {
+
+    const action = (args[0] || "status").toLowerCase();
+
+    // ═══════════════════════════════════════
+    // 📊 STATUT
+    // ═══════════════════════════════════════
+
+    if (action === "status") {
+
+      const state = await getState();
+
+      return message.reply(
+        state.locked
+          ? "╭━━━〔 🔒 𝙇𝙊𝘾𝙆 𝘾𝙈𝘿 〕━━━╮\n" +
+            "┃\n" +
+            "┃ 🔴 𝙎𝙏𝘼𝙏𝙐𝙏 : 𝘽𝙇𝙊𝙌𝙐𝙀́\n" +
+            "┃\n" +
+            "┃ 😴 𝙉𝙖𝙜𝙞 › Les commandes sont\n" +
+            "┃ bloquées.\n" +
+            "┃\n" +
+            "┃ 🐝 𝘽𝙖𝙘𝙝𝙞𝙧𝙖 › Tout est verrouillé !\n" +
+            "┃\n" +
+            "╰━━━━━━━━━━━━━━━━━━━━━━╯"
+
+          : "╭━━━〔 🔓 𝙇𝙊𝘾𝙆 𝘾𝙈𝘿 〕━━━╮\n" +
+            "┃\n" +
+            "┃ 🟢 𝙎𝙏𝘼𝙏𝙐𝙏 : 𝘼𝘾𝙏𝙄𝙁\n" +
+            "┃\n" +
+            "┃ 😴 𝙉𝙖𝙜𝙞 › Les commandes fonctionnent.\n" +
+            "┃\n" +
+            "┃ 🐝 𝘽𝙖𝙘𝙝𝙞𝙧𝙖 › Le terrain est libre !\n" +
+            "┃\n" +
+            "╰━━━━━━━━━━━━━━━━━━━━━━╯"
+      );
+    }
+
+    // ═══════════════════════════════════════
+    // 🔒 BLOQUER
+    // ═══════════════════════════════════════
+
+    if (
+      action === "on" ||
+      action === "lock" ||
+      action === "enable"
+    ) {
+
+      const state = await getState();
+
+      if (state.locked) {
+        return message.reply(
+          "🔒 𝙇𝙊𝘾𝙆 𝘾𝙈𝘿\n\n" +
+          "😴 𝙉𝙖𝙜𝙞 › C'est déjà verrouillé."
+        );
+      }
+
+      await setState(true);
+
+      return message.reply(
+        "╭━━━〔 🔒 𝙇𝙊𝘾𝙆 𝘼𝘾𝙏𝙄𝙑𝙀́ 〕━━━╮\n" +
+        "┃\n" +
+        "┃ 🔴 𝙎𝙏𝘼𝙏𝙐𝙏 : 𝘽𝙇𝙊𝙌𝙐𝙀́\n" +
+        "┃\n" +
+        "┃ 😴 𝙉𝙖𝙜𝙞 › Plus aucune commande.\n" +
+        "┃\n" +
+        "┃ 🐝 𝘽𝙖𝙘𝙝𝙞𝙧𝙖 › Tout le monde au repos !\n" +
+        "┃\n" +
+        "╰━━━━━━━━━━━━━━━━━━━━━━━━╯"
+      );
+    }
+
+    // ═══════════════════════════════════════
+    // 🔓 DÉBLOQUER
+    // ═══════════════════════════════════════
+
+    if (
+      action === "off" ||
+      action === "unlock" ||
+      action === "disable"
+    ) {
+
+      const state = await getState();
+
+      if (!state.locked) {
+        return message.reply(
+          "🔓 𝙇𝙊𝘾𝙆 𝘾𝙈𝘿\n\n" +
+          "🐝 𝘽𝙖𝙘𝙝𝙞𝙧𝙖 › Tout fonctionne déjà !"
+        );
+      }
+
+      await setState(false);
+
+      return message.reply(
+        "╭━━━〔 🔓 𝙇𝙊𝘾𝙆 𝘿𝙀́𝙎𝘼𝘾𝙏𝙄𝙑𝙀́ 〕━━━╮\n" +
+        "┃\n" +
+        "┃ 🟢 𝙎𝙏𝘼𝙏𝙐𝙏 : 𝘼𝘾𝙏𝙄𝙁\n" +
+        "┃\n" +
+        "┃ 😴 𝙉𝙖𝙜𝙞 › On peut reprendre.\n" +
+        "┃\n" +
+        "┃ 🐝 𝘽𝙖𝙘𝙝𝙞𝙧𝙖 › Le monstre est réveillé !\n" +
+        "┃\n" +
+        "╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯"
+      );
+    }
+
+    // ═══════════════════════════════════════
+    // ❓ AIDE
+    // ═══════════════════════════════════════
+
+    return message.reply(
+      "╭━━━〔 🔐 𝙇𝙊𝘾𝙆 𝘾𝙈𝘿 〕━━━╮\n" +
+      "┃\n" +
+      "┃ 🔒 lockcmd on\n" +
+      "┃ └ Bloquer toutes les commandes\n" +
+      "┃\n" +
+      "┃ 🔓 lockcmd off\n" +
+      "┃ └ Débloquer toutes les commandes\n" +
+      "┃\n" +
+      "┃ 📊 lockcmd status\n" +
+      "┃ └ Voir le statut\n" +
+      "┃\n" +
+      "┃ 😴 Nagi × 🐝 Bachira\n" +
+      "┃ 🔐 Réservé aux admins du bot\n" +
+      "┃\n" +
+      "╰━━━━━━━━━━━━━━━━━━━━━━╯"
+    );
+  }
+};
