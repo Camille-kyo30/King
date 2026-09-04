@@ -1,0 +1,323 @@
+// Commande GoatBot V2 — Jeu de hacker
+
+
+const games = new Map() // threadID_uid -> partie en cours
+
+const CIBLES = [
+  { nom: "Banque Centrale", niveau: 3, gain: 5000 },
+  { nom: "Serveur du Pentagone", niveau: 5, gain: 15000 },
+  { nom: "Wifi du voisin", niveau: 1, gain: 300 },
+  { nom: "Base de données Facebook", niveau: 4, gain: 9000 },
+  { nom: "Caméras de la ville", niveau: 2, gain: 1200 },
+  { nom: "Satellite militaire", niveau: 5, gain: 20000 },
+  { nom: "Distributeur automatique", niveau: 2, gain: 800 }
+]
+
+const FIREWALLS = ["ICE-7", "BlackWall", "Kryptos", "Cerberus", "NullSec", "OmegaGate"]
+
+function rand(arr) { return arr[Math.floor(Math.random() * arr.length)] }
+function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min }
+
+function genCode(niveau) {
+  const chars = "ABCDEF0123456789"
+  const len = 3 + niveau // 4 à 8 caractères
+  let out = ""
+  for (let i = 0; i < len; i++) out += chars[Math.floor(Math.random() * chars.length)]
+  return out
+}
+
+function barre(p) {
+  const total = 20
+  const full = Math.round((p / 100) * total)
+  return "[" + "█".repeat(full) + "░".repeat(total - full) + `] ${p}%`
+}
+
+function compteVide() {
+  return { credits: 500, rang: 1, reussies: 0, echecs: 0, pseudo: null, inscritLe: null }
+}
+
+async function getCompte(usersData, uid) {
+  const data = await usersData.get(uid)
+  return { data, h: data.data?.hacker || null }
+}
+
+async function saveCompte(usersData, uid, data, h) {
+  await usersData.set(uid, { data: { ...data.data, hacker: h } })
+}
+
+// Masque le code en révélant les positions listées dans "revelees"
+function masque(code, revelees) {
+  return code
+    .split("")
+    .map((c, i) => (revelees.includes(i) ? c : "•"))
+    .join(" ")
+}
+
+// Indices automatiques sur le code
+function indicesCode(code) {
+  const chiffres = code.split("").filter(c => /[0-9]/.test(c)).length
+  const lettres = code.length - chiffres
+  const somme = code.split("").reduce((s, c) => s + parseInt(c, 16), 0)
+  return (
+    `🧩 Indices :\n` +
+    `   • ${lettres} lettre(s) (A-F) et ${chiffres} chiffre(s)\n` +
+    `   • Somme hex des caractères = ${somme}\n` +
+    `   • Premier caractère : ${code[0]}`
+  )
+}
+
+module.exports = {
+  config: {
+    name: "hacker",
+    aliases: ["hack", "piratage"],
+    version: "2.0",
+    author: "Camille uchiha",
+    countDown: 5,
+    role: 0,
+    shortDescription: { fr: "Jeu de hacker", en: "Hacker game" },
+    longDescription: {
+      fr: "Mini-jeu de piratage : crée ton compte, choisis une cible, casse le firewall et décrypte le code d'accès grâce aux indices.",
+      en: "Hacking mini-game: create your account, break the firewall and crack the access code with hints."
+    },
+    category: "game",
+    guide: {
+      fr:
+        "{pn} créer <pseudo> — créer ton compte hacker\n" +
+        "{pn} — lancer une mission de piratage\n" +
+        "{pn} indice — acheter un indice (100 ₿) pendant une mission\n" +
+        "{pn} top — classement des hackers\n" +
+        "{pn} profil — ton profil hacker\n" +
+        "{pn} supprimer — supprimer ton compte"
+    }
+  },
+
+  onStart: async function ({ message, event, args, usersData }) {
+    const uid = event.senderID
+    const key = `${event.threadID}_${uid}`
+    const sub = (args[0] || "").toLowerCase()
+
+    // --- Classement (public) ---
+    if (sub === "top" || sub === "classement") {
+      const all = await usersData.getAll()
+      const list = all
+        .filter(u => u.data?.hacker?.inscritLe)
+        .sort((a, b) => (b.data.hacker.credits || 0) - (a.data.hacker.credits || 0))
+        .slice(0, 10)
+      if (!list.length) return message.reply("╔═══ TOP HACKERS ═══╗\n Aucun hacker enregistré.\n╚══════════════════╝")
+      const txt = list.map((u, i) => `${i + 1}. ${u.data.hacker.pseudo || u.name} — ${u.data.hacker.credits || 0} ₿ (rang ${u.data.hacker.rang || 1})`).join("\n")
+      return message.reply(`╔═══ TOP HACKERS ═══╗\n${txt}\n╚══════════════════╝`)
+    }
+
+    // --- Création de compte ---
+    if (sub === "créer" || sub === "creer" || sub === "register" || sub === "inscription") {
+      const { data, h } = await getCompte(usersData, uid)
+      if (h?.inscritLe) return message.reply(`⚠️ Tu as déjà un compte hacker (pseudo : ${h.pseudo}).`)
+      const pseudo = args.slice(1).join(" ").trim().slice(0, 20)
+      if (!pseudo) return message.reply("🖥️ Usage : hacker créer <pseudo>\nExemple : hacker créer Gh0stByte")
+      const all = await usersData.getAll()
+      if (all.some(u => (u.data?.hacker?.pseudo || "").toLowerCase() === pseudo.toLowerCase()))
+        return message.reply("🚫 Ce pseudo est déjà utilisé par un autre hacker.")
+      const nouveau = { ...compteVide(), pseudo, inscritLe: Date.now() }
+      await saveCompte(usersData, uid, data, nouveau)
+      return message.reply(
+        `╔═══ COMPTE CRÉÉ ═══╗\n` +
+        `👤 Pseudo : ${pseudo}\n` +
+        `₿ Crédits de départ : ${nouveau.credits}\n` +
+        `🏅 Rang : 1\n` +
+        `╚══════════════════╝\n` +
+        `Tape « hacker » pour lancer ta première intrusion.`
+      )
+    }
+
+    // --- Suppression de compte ---
+    if (sub === "supprimer" || sub === "delete") {
+      const { data, h } = await getCompte(usersData, uid)
+      if (!h?.inscritLe) return message.reply("❌ Tu n'as pas de compte hacker.")
+      const rest = { ...data.data }
+      delete rest.hacker
+      await usersData.set(uid, { data: rest })
+      return message.reply("🗑️ Compte hacker supprimé. Tape « hacker créer <pseudo> » pour recommencer.")
+    }
+
+    const { data, h } = await getCompte(usersData, uid)
+    if (!h?.inscritLe)
+      return message.reply(
+        `🔒 Accès refusé : aucun compte hacker détecté.\n` +
+        `Crée le tien avec :\n   hacker créer <pseudo>`
+      )
+
+    // --- Profil ---
+    if (sub === "profil" || sub === "profile") {
+      return message.reply(
+        `╔═══ PROFIL HACKER ═══╗\n` +
+        `👤 Pseudo : ${h.pseudo}\n` +
+        `🏅 Rang : ${h.rang || 1}\n` +
+        `₿ Crédits : ${h.credits || 0}\n` +
+        `✅ Intrusions réussies : ${h.reussies || 0}\n` +
+        `❌ Échecs : ${h.echecs || 0}\n` +
+        `📅 Inscrit le : ${new Date(h.inscritLe).toLocaleDateString("fr-FR")}\n` +
+        `╚════════════════════╝`
+      )
+    }
+
+    // --- Indice payant pendant une mission ---
+    if (sub === "indice" || sub === "hint") {
+      const partie = games.get(key)
+      if (!partie) return message.reply("❌ Aucune intrusion en cours.")
+      if ((h.credits || 0) < 100) return message.reply("💸 Il te faut 100 ₿ pour acheter un indice.")
+      const cachees = partie.code.split("").map((_, i) => i).filter(i => !partie.revelees.includes(i))
+      if (!cachees.length) return message.reply("🔓 Tout le code est déjà révélé !")
+      partie.revelees.push(rand(cachees))
+      h.credits -= 100
+      await saveCompte(usersData, uid, data, h)
+      return message.reply(
+        `💡 Indice acheté (-100 ₿)\n` +
+        `🔐 Code : ${masque(partie.code, partie.revelees)}\n` +
+        `₿ Solde : ${h.credits}`
+      )
+    }
+
+    if (games.has(key)) return message.reply("⚠️ Tu as déjà une intrusion en cours. Termine-la d'abord.")
+
+    const cible = rand(CIBLES)
+    const firewall = rand(FIREWALLS)
+    const code = genCode(cible.niveau)
+    const essais = Math.max(4, 9 - cible.niveau)
+    const revelees = [0] // premier caractère offert
+
+    const msg =
+      `╔════════════════════════════╗\n` +
+      `   ☠️  T E R M I N A L   ☠️\n` +
+      `╚════════════════════════════╝\n` +
+      `> hacker : ${h.pseudo}\n` +
+      `> connexion au réseau ... OK\n` +
+      `> ${barre(randInt(70, 99))}\n\n` +
+      `🎯 Cible : ${cible.nom}\n` +
+      `🛡️ Firewall : ${firewall} (niveau ${cible.niveau}/5)\n` +
+      `💰 Butin : ${cible.gain} ₿\n\n` +
+      `🔐 Code d'accès (${code.length} caractères hex) :\n   ${masque(code, revelees)}\n\n` +
+      indicesCode(code) + `\n\n` +
+      `Réponds à ce message avec le code complet.\n` +
+      `💡 « hacker indice » révèle un caractère (100 ₿).\n` +
+      `Essais restants : ${essais}\n` +
+      `⏳ Auto-déconnexion dans 120s.`
+
+    const info = await message.reply(msg)
+
+    const partie = {
+      messageID: info.messageID,
+      author: uid,
+      code,
+      cible,
+      firewall,
+      essais,
+      revelees,
+      timeout: setTimeout(() => {
+        if (games.has(key)) {
+          games.delete(key)
+          message.unsend(info.messageID).catch(() => {})
+          message.reply(`🚨 Trace détectée ! Connexion coupée par ${firewall}. Mission "${cible.nom}" abandonnée.\n🔐 Le code était : ${code}`)
+        }
+      }, 120000)
+    }
+    games.set(key, partie)
+    global.GoatBot.onReply.set(info.messageID, {
+      commandName: "hacker",
+      key,
+      author: uid
+    })
+  },
+
+  onReply: async function ({ message, event, Reply, usersData }) {
+    const key = Reply.key
+    const partie = games.get(key)
+    if (!partie) return
+    if (event.senderID !== partie.author) return message.reply("🚫 Ce terminal n'est pas le tien.")
+
+    const essai = (event.body || "").trim().toUpperCase().replace(/\s+/g, "")
+    if (!/^[A-F0-9]+$/.test(essai)) return message.reply("❌ Format invalide. Uniquement des caractères hex (0-9, A-F).")
+    if (essai.length !== partie.code.length)
+      return message.reply(`❌ Le code fait ${partie.code.length} caractères, tu en as envoyé ${essai.length}.`)
+
+    const { data, h } = await getCompte(usersData, event.senderID)
+    const compte = h || compteVide()
+
+    if (essai === partie.code) {
+      clearTimeout(partie.timeout)
+      games.delete(key)
+      global.GoatBot.onReply.delete(partie.messageID)
+
+      compte.credits = (compte.credits || 0) + partie.cible.gain
+      compte.reussies = (compte.reussies || 0) + 1
+      compte.rang = Math.max(1, Math.floor(compte.reussies / 5) + 1)
+      await saveCompte(usersData, event.senderID, data, compte)
+
+      return message.reply(
+        `╔══════════════════════════╗\n` +
+        `   ✅ A C C È S   R O O T\n` +
+        `╚══════════════════════════╝\n` +
+        `> ${barre(100)}\n` +
+        `> firewall ${partie.firewall} contourné\n` +
+        `> données exfiltrées : ${partie.cible.nom}\n\n` +
+        `💰 +${partie.cible.gain} ₿\n` +
+        `₿ Solde : ${compte.credits}\n` +
+        `🏅 Rang : ${compte.rang}`
+      )
+    }
+
+    // mauvais code : indices de proximité
+    let bons = 0
+    for (let i = 0; i < partie.code.length; i++) if (essai[i] === partie.code[i]) bons++
+
+    // caractères présents mais mal placés
+    const restCode = []
+    const restEssai = []
+    for (let i = 0; i < partie.code.length; i++) {
+      if (essai[i] !== partie.code[i]) { restCode.push(partie.code[i]); restEssai.push(essai[i]) }
+    }
+    let malPlaces = 0
+    for (const c of restEssai) {
+      const idx = restCode.indexOf(c)
+      if (idx !== -1) { malPlaces++; restCode.splice(idx, 1) }
+    }
+
+    partie.essais--
+
+    // révélation gratuite d'un caractère à mi-parcours
+    let bonus = ""
+    const cachees = partie.code.split("").map((_, i) => i).filter(i => !partie.revelees.includes(i))
+    if (partie.essais > 0 && cachees.length > 1 && partie.essais % 2 === 0) {
+      partie.revelees.push(rand(cachees))
+      bonus = `\n🎁 Indice offert : ${masque(partie.code, partie.revelees)}`
+    }
+
+    if (partie.essais <= 0) {
+      clearTimeout(partie.timeout)
+      games.delete(key)
+      global.GoatBot.onReply.delete(partie.messageID)
+
+      compte.echecs = (compte.echecs || 0) + 1
+      compte.credits = Math.max(0, (compte.credits || 0) - 200)
+      await saveCompte(usersData, event.senderID, data, compte)
+
+      return message.reply(
+        `╔══════════════════════════╗\n` +
+        `   ⛔ I N T R U S I O N\n` +
+        `      B L O Q U É E\n` +
+        `╚══════════════════════════╝\n` +
+        `🛡️ ${partie.firewall} t'a repéré.\n` +
+        `🔐 Le code était : ${partie.code}\n` +
+        `💸 -200 ₿ (frais d'anonymisation)`
+      )
+    }
+
+    return message.reply(
+      `⚠️ Code refusé.\n` +
+      `🔎 ${bons}/${partie.code.length} bien placés · ${malPlaces} présent(s) mais mal placé(s)\n` +
+      `🔐 Code : ${masque(partie.code, partie.revelees)}\n` +
+      `Essais restants : ${partie.essais}\n` +
+      `> ${barre(Math.round((bons / partie.code.length) * 100))}` +
+      bonus
+    )
+  }
+}
