@@ -2,8 +2,7 @@ module.exports = {
   config: {
     name: "autotime",
     version: "10.02",
-    author: "𝐒𝐡𝐢𝐏𝐮 𝐀𝐢 🤖💨",
-    editor:"Camille uchiha 🎀",
+    author: "Camille Uchiha 🎀",
     countDown: 5,
     role: 0,
     shortDescription: {
@@ -126,6 +125,8 @@ module.exports = {
   onStart: async function() {}, // Fonction vide car cette commande est un minuteur automatique
 
   onLoad: async function({ api }) {
+    const messagesList = module.exports.messages;
+
     setInterval(() => {
       const now = new Date(Date.now() + 25200000).toLocaleString('en-US', {
         hour12: false,
@@ -134,7 +135,7 @@ module.exports = {
         second: '2-digit'
       }).trim();
 
-      const scheduledMessage = this.messages.find(item => item.timer === now);
+      const scheduledMessage = messagesList.find(item => item.timer === now);
 
       if (scheduledMessage) {
         global.GoatBot.allThreadID.forEach(threadID => {
@@ -142,6 +143,6 @@ module.exports = {
         });
       }
     }, 1000);
- 
-  }
+
+    }
 };
