@@ -71,6 +71,6 @@ async function getListOfFriendRequests(api) {
   };
 
   const response = await api.httpPost("https://www.facebook.com/api/graphql/", form);
-  return JSON.parse(response).data.viewer.friending_possibilities.edges;
+  return JSON.parse(response).data.viewer.friending_possibilities.
+    edges;
 }
-```
